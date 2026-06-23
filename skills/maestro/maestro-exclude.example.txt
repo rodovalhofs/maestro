@@ -1,0 +1,6 @@
+# One skill name per line. Lines starting with # are ignored.
+# Rebuild manifest after edits: python ~/.cursor/skills/maestro/scripts/build-manifest.py
+
+# Examples (uncomment to use):
+# zoom-apps-sdk
+# twilio-voice-twiml

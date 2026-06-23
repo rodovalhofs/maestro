@@ -1,0 +1,27 @@
+name: Feature
+description: Nova funcionalidade ou melhoria
+title: "feat(escopo): "
+labels: ["tipo: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: Defina objetivo, escopo e o que fica fora.
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+    validations:
+      required: true
+  - type: textarea
+    id: escopo
+    attributes:
+      label: Escopo (checklist)
+      placeholder: |
+        - [ ] Item 1
+        - [ ] Item 2
+    validations:
+      required: true
+  - type: textarea
+    id: fora
+    attributes:
+      label: Fora de escopo

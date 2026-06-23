@@ -1,0 +1,17 @@
+name: Chore
+description: Docs, CI, refactor, dependencias
+title: "chore(escopo): "
+labels: ["tipo: chore"]
+body:
+  - type: textarea
+    id: tarefa
+    attributes:
+      label: O que fazer
+    validations:
+      required: true
+  - type: textarea
+    id: motivo
+    attributes:
+      label: Por que
+    validations:
+      required: true

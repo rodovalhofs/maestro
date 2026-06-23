@@ -1,0 +1,34 @@
+name: Bug
+description: Algo quebrou ou comportamento incorreto
+title: "fix(escopo): "
+labels: ["tipo: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Descreva o problema com passos para reproduzir.
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descricao
+      description: O que acontece vs o esperado?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduzir
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Passo um
+        2. Passo dois
+    validations:
+      required: true
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade
+      options:
+        - alta
+        - media
+        - baixa
+    validations:
+      required: true

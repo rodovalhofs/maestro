@@ -1,0 +1,12 @@
+[
+  { "name": "tipo: bug", "color": "E84C3D", "description": "Correcao de erro" },
+  { "name": "tipo: feature", "color": "3D8BF7", "description": "Nova funcionalidade" },
+  { "name": "tipo: docs", "color": "737373", "description": "Documentacao" },
+  { "name": "tipo: chore", "color": "163475", "description": "Manutencao, deps, CI" },
+  { "name": "prioridade: alta", "color": "F4B30F", "description": "Bloqueia operacao" },
+  { "name": "prioridade: media", "color": "66C94B", "description": "Importante, nao urgente" },
+  { "name": "prioridade: baixa", "color": "EDF2F8", "description": "Pode esperar" },
+  { "name": "ci:falha", "color": "E84C3D", "description": "Pipeline CI falhou — corrigir antes do merge" },
+  { "name": "status: em-progresso", "color": "3D8BF7", "description": "Em desenvolvimento" },
+  { "name": "status: em-review", "color": "F4B30F", "description": "PR aberto aguardando merge" }
+]
