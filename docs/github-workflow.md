@@ -76,8 +76,13 @@ gh label create -f templates/labels.json  # ou script proprio
 ## Manutencao dos templates
 
 ```powershell
-cd C:\Projetos\maestro
+# Na raiz do clone do repositorio maestro
 .\scripts\sync-templates.ps1 -TargetRepo "C:\caminho\do\seu\projeto"
+```
+
+```bash
+# macOS / Linux (PowerShell Core)
+pwsh ./scripts/sync-templates.ps1 -TargetRepo "$HOME/projetos/meu-repo"
 ```
 
 Nao versione `templates/` dentro de cada repo de aplicacao; copie para `.github/` local.
