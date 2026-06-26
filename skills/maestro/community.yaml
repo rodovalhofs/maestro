@@ -1,0 +1,16 @@
+# Community mappings: skills useful but possibly not installed.
+# Maestro surfaces these as missing_skills with install_hint when they match a task.
+
+skills:
+  superdesign:
+    description: Frontend UI/UX design agent with infinite canvas drafts
+    tags: [design, ui, ux, superdesign]
+    install: "npx skills add superdesigndev/superdesign-skill -g -a cursor -y --skill superdesign"
+  systematic-debugging:
+    description: Structured root-cause debugging workflow for failing tests and bugs
+    tags: [debug, troubleshooting, root-cause]
+    install: "Install a systematic-debugging skill into ~/.cursor/skills or ~/.agents/skills"
+  arxiv:
+    description: Literature search and research paper workflows
+    tags: [research, papers, arxiv]
+    install: "Install an arxiv or literature-search skill before research-heavy tasks"

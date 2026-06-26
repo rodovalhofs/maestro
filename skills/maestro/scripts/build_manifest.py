@@ -18,6 +18,7 @@ from domains import classify_skill  # noqa: E402
 
 CURSOR_HOME = Path(os.environ.get("CURSOR_HOME", Path.home() / ".cursor"))
 PERSONAL_SKILLS = CURSOR_HOME / "skills"
+AGENTS_SKILLS = Path.home() / ".agents" / "skills"
 MANIFEST_PATH = CURSOR_HOME / "skills-manifest.json"
 EXCLUDE_PATH = CURSOR_HOME / "maestro-exclude.txt"
 MAESTRO_NAMES = {"maestro"}
@@ -51,6 +52,32 @@ def parse_frontmatter(text: str) -> dict[str, str]:
             current_lines.append(line.strip())
     flush()
     return result
+
+
+def parse_tags_from_text(text: str) -> list[str]:
+    match = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
+    if not match:
+        return []
+    block = match.group(1)
+    tags: list[str] = []
+    in_tags = False
+    for line in block.splitlines():
+        stripped = line.strip()
+        if re.match(r"^tags:\s*$", stripped):
+            in_tags = True
+            continue
+        if re.match(r"^tags:\s*\[", stripped):
+            inner = stripped.split("[", 1)[1].rstrip("]")
+            tags.extend(
+                item.strip().strip("'\"") for item in inner.split(",") if item.strip()
+            )
+            return tags
+        if in_tags:
+            if line.startswith("  - "):
+                tags.append(line.strip()[2:].strip().strip('"').strip("'"))
+            elif stripped and not line.startswith(" "):
+                in_tags = False
+    return tags
 
 
 def load_exclude_list() -> set[str]:
@@ -89,15 +116,24 @@ def iter_skill_dirs(root: Path, scope: str) -> list[dict]:
         if not description:
             description = text[:400].replace("\n", " ")
 
-        domain = classify_skill(name, description)
+        raw_domain = meta.get("domain", "")
+        if raw_domain.lower() in {"cybersecurity", "security"}:
+            skill_domain = "security"
+        else:
+            skill_domain = classify_skill(name, description)
+
+        tags = parse_tags_from_text(text)
+
         entries.append(
             {
                 "name": name,
                 "folder": folder_name,
                 "description": description[:1024],
-                "domain": domain,
+                "tags": tags,
+                "domain": skill_domain,
                 "path": str(skill_md).replace("\\", "/"),
                 "scope": scope,
+                "installed": True,
             }
         )
 
@@ -105,20 +141,22 @@ def iter_skill_dirs(root: Path, scope: str) -> list[dict]:
 
 
 def build_manifest(project_root: Path | None) -> dict:
-    skills = iter_skill_dirs(PERSONAL_SKILLS, "personal")
+    skills: list[dict] = []
+    skills.extend(iter_skill_dirs(PERSONAL_SKILLS, "personal"))
+    skills.extend(iter_skill_dirs(AGENTS_SKILLS, "agents"))
     if project_root:
         project_skills = project_root / ".cursor" / "skills"
         skills.extend(iter_skill_dirs(project_skills, "project"))
 
     dedup: dict[str, dict] = {}
     for skill in skills:
-        key = f"{skill['scope']}:{skill['folder']}"
-        dedup[key] = skill
+        dedup[skill["folder"]] = skill
 
     return {
-        "version": 1,
+        "version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "personal_skills_root": str(PERSONAL_SKILLS).replace("\\", "/"),
+        "agents_skills_root": str(AGENTS_SKILLS).replace("\\", "/"),
         "skill_count": len(dedup),
         "skills": sorted(dedup.values(), key=lambda s: (s["domain"], s["name"])),
     }

@@ -1,8 +1,9 @@
 ---
 name: maestro
 description: >-
-  Meta-orchestrator that analyzes the user prompt, searches ~500+ local skills
-  via BM25, builds an editable dependency graph, and spawns focused subagents
+  Meta-orchestrator that analyzes the user prompt, searches local skills via
+  hybrid BM25 routing (intents, tags, synonyms, P0-P3), builds an editable
+  dependency graph, and spawns focused subagents
   after user confirmation. Use when the user invokes $maestro, asks which skills
   to use, wants optimal skill routing, or has a complex task spanning multiple
   domains and does not know which skill to call.
@@ -28,33 +29,47 @@ Orchestrate local Cursor skills. Maestro does **not** implement work itself — 
 |------|---------|
 | `~/.cursor/skills-manifest.json` | Searchable catalog (regenerate with build-manifest) |
 | `~/.cursor/maestro-exclude.txt` | Skills banned from search |
-| `scripts/build-manifest.py` | Regenerate manifest |
-| `scripts/search-skills.py` | BM25 search by domain bucket |
+| `scripts/build_manifest.py` | Regenerate manifest (tags + `~/.agents/skills`) |
+| `scripts/search_skills.py` | Hybrid BM25 search + routing P0-P3 |
+| `scripts/route_tasks.py` | Batch route decomposed sub-tasks |
+| `community.yaml` | Missing-skill hints for not-installed workflows |
 
 ## Workflow
 
 ### 1. Refresh manifest (if stale or missing)
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\build-manifest.py" --project-root "<workspace-root>"
+py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\build_manifest.py" --project-root "<workspace-root>"
 ```
 
 Fallback: `python` instead of `py -3` if needed.
 
-On Unix: `python3 ~/.cursor/skills/maestro/scripts/build-manifest.py --project-root "<workspace-root>"`
+On Unix: `python3 ~/.cursor/skills/maestro/scripts/build_manifest.py --project-root "<workspace-root>"`
 
 ### 2. Search skills
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search-skills.py" "<user prompt>" --json
+py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search_skills.py" "<user prompt>" --json
 ```
 
-Optional: `--domain web|data-viz|analytics|design|creative|devops-git|video-media|integrations|meta|general`
+Optional: `--domain web|data-viz|analytics|design|creative|devops-git|video-media|integrations|security|meta|general`
+
+JSON includes `routing` (P0-P3), `confidence`, `mode`, `missing_skills`, `intent_boosts`.
+
+Follow `routing.priority` and `routing.decision`; use `results` as evidence.
+
+### 2b. Refine graph nodes (after draft decomposition)
+
+```bash
+printf '%s\n' "<task 1>" "<task 2>" | py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\route_tasks.py" --json
+```
+
+Merge router output into the graph: prefer installed `path` when `mode` is `auto-load`; surface `missing_skills` with `install_hint` when useful.
 
 Para tarefas com codigo versionado, inclua no grafo nos de implementacao, git e sintese:
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search-skills.py" "github issues PR yeet branch feat CI" --domain devops-git --json
+py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search_skills.py" "github issues PR yeet branch feat CI" --domain devops-git --json
 ```
 
 Leia `docs/github-workflow.md` (neste repo ou copiado para o projeto) quando a tarefa tocar codigo versionado.
@@ -66,7 +81,7 @@ If `weak_match: true` in JSON:
 - **`low_top_score` / `tight_spread` / `no_results`** → ask domain in one line:
 
   > Domínio não ficou claro. Qual se aplica?
-  > A) Web/apps  B) Data viz  C) Analytics  D) Design  E) Creative  F) Git/CI  G) Integrations  H) Outro
+  > A) Web/apps  B) Data viz  C) Analytics  D) Design  E) Creative  F) Git/CI  G) Integrations  H) Security  I) Outro
 
   Re-run search with `--domain <choice>`.
 
@@ -176,7 +191,7 @@ cp templates/CONTRIBUTING.md <seu-projeto>/
 
 ## Domain buckets
 
-`web`, `data-viz`, `analytics`, `design`, `creative`, `devops-git`, `video-media`, `integrations`, `meta`, `general`
+`web`, `data-viz`, `analytics`, `design`, `creative`, `devops-git`, `video-media`, `integrations`, `security`, `meta`, `general`
 
 ## Hub skills (prefer as single node when broad)
 
@@ -202,7 +217,7 @@ cp templates/CONTRIBUTING.md <seu-projeto>/
 After syncing Codex skills, regenerate manifest:
 
 ```bash
-py -3 ~/.cursor/skills/maestro/scripts/build-manifest.py
+py -3 ~/.cursor/skills/maestro/scripts/build_manifest.py
 ```
 
 Or run the full sync script which rebuilds manifest automatically.
