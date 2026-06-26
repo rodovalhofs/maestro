@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "skill_count": 6,
+  "skills": [
+    {
+      "name": "superdesign",
+      "folder": "superdesign",
+      "description": "Frontend UI/UX design agent for superdesign canvas drafts",
+      "tags": ["design", "ui", "ux"],
+      "domain": "design",
+      "path": "/tmp/skills/superdesign/SKILL.md",
+      "scope": "agents",
+      "installed": true
+    },
+    {
+      "name": "systematic-debugging",
+      "folder": "systematic-debugging",
+      "description": "Structured root cause debugging for failing tests",
+      "tags": ["debug", "troubleshooting"],
+      "domain": "web",
+      "path": "/tmp/skills/systematic-debugging/SKILL.md",
+      "scope": "personal",
+      "installed": true
+    },
+    {
+      "name": "gh-fix-ci",
+      "folder": "gh-fix-ci",
+      "description": "Fix failing GitHub Actions CI checks on pull requests",
+      "tags": ["github", "ci"],
+      "domain": "devops-git",
+      "path": "/tmp/skills/gh-fix-ci/SKILL.md",
+      "scope": "personal",
+      "installed": true
+    },
+    {
+      "name": "performing-memory-forensics-with-volatility3",
+      "folder": "performing-memory-forensics-with-volatility3",
+      "description": "Analyze memory dumps with Volatility 3 for credential theft",
+      "tags": ["forensics", "volatility", "memory-forensics"],
+      "domain": "security",
+      "path": "/tmp/skills/performing-memory-forensics-with-volatility3/SKILL.md",
+      "scope": "agents",
+      "installed": true
+    },
+    {
+      "name": "react-best-practices",
+      "folder": "react-best-practices",
+      "description": "React component patterns and performance",
+      "tags": ["react", "frontend"],
+      "domain": "web",
+      "path": "/tmp/skills/react-best-practices/SKILL.md",
+      "scope": "personal",
+      "installed": true
+    },
+    {
+      "name": "maestro",
+      "folder": "maestro",
+      "description": "Meta orchestrator",
+      "tags": ["meta"],
+      "domain": "meta",
+      "path": "/tmp/skills/maestro/SKILL.md",
+      "scope": "personal",
+      "installed": true
+    }
+  ]
+}

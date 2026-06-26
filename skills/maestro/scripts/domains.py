@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import re
-
 DOMAINS: list[str] = [
     "web",
     "data-viz",
@@ -14,6 +12,7 @@ DOMAINS: list[str] = [
     "devops-git",
     "video-media",
     "integrations",
+    "security",
     "meta",
     "general",
 ]
@@ -28,7 +27,7 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "data-viz": [
         "chart", "graph", "visualization", "dashboard", "d3", "canvas", "threejs",
         "geospatial", "map", "gantt", "diagram", "scrollytelling", "plot",
-        "accessibility", "svg", "webgl",
+        "accessibility", "svg", "webgl", "painel",
     ],
     "analytics": [
         "data quality", "kpi", "jupyter", "notebook", "metric", "report",
@@ -38,7 +37,14 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "design": [
         "prototype", "ideate", "audit", "design qa", "ux research", "figma",
         "mockup", "wireframe", "ui", "ux", "product design", "url-to-code",
-        "image-to-code", "user flow", "onboarding",
+        "image-to-code", "user flow", "onboarding", "superdesign", "design system",
+        "interface", "layout",
+    ],
+    "security": [
+        "security", "cybersecurity", "forensics", "malware", "pentest",
+        "penetration", "threat", "incident response", "mitre", "attack",
+        "vulnerability", "siem", "dfir", "red team", "blue team", "seguranca",
+        "forense", "volatility",
     ],
     "creative": [
         "moodboard", "logo", "ads", "brand", "creative", "shot", "scene",
@@ -91,6 +97,9 @@ def _text_blob(name: str, description: str) -> str:
 
 
 def classify_skill(name: str, description: str) -> str:
+    if name.lower() == "superdesign":
+        return "design"
+
     blob = _text_blob(name, description)
     for prefix, domain in NAME_PREFIX_DOMAIN:
         if name.lower().startswith(prefix):
@@ -132,6 +141,7 @@ def domain_label(domain: str) -> str:
         "devops-git": "Git / CI / DevOps",
         "video-media": "Video / media",
         "integrations": "Integrations / SDKs",
+        "security": "Cybersecurity",
         "meta": "Meta / tooling",
         "general": "General",
     }
