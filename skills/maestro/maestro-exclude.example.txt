@@ -1,5 +1,5 @@
 # One skill name per line. Lines starting with # are ignored.
-# Rebuild manifest after edits: python ~/.cursor/skills/maestro/scripts/build-manifest.py
+# Rebuild manifest after edits: python ~/.cursor/skills/maestro/scripts/build_manifest.py
 
 # Examples (uncomment to use):
 # zoom-apps-sdk

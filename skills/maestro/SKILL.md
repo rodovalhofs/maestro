@@ -27,7 +27,7 @@ Orchestrate local Cursor skills. Maestro does **not** implement work itself — 
 
 | File | Purpose |
 |------|---------|
-| `~/.cursor/skills-manifest.json` | Searchable catalog (regenerate with build-manifest) |
+| `~/.cursor/skills-manifest.json` | Searchable catalog (regenerate with build_manifest) |
 | `~/.cursor/maestro-exclude.txt` | Skills banned from search |
 | `scripts/build_manifest.py` | Regenerate manifest (tags + `~/.agents/skills`) |
 | `scripts/search_skills.py` | Hybrid BM25 search + routing P0-P3 |
