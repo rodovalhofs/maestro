@@ -76,6 +76,37 @@ INTENT_PROFILES: list[dict[str, Any]] = [
         "min_boost": 2.0,
         "suggested_mode": "auto-load",
     },
+    {
+        "name": "skill-discovery",
+        "task_patterns": [
+            r"\bfind (a )?skill\b",
+            r"\bnpx skills\b",
+            r"\bskills\.sh\b",
+            r"\btem skill (para|de)\b",
+            r"\binstalar skill\b",
+            r"\bis there a skill\b",
+            r"\bdiscover (agent )?skills\b",
+        ],
+        "skill_patterns": [
+            r"find-skills",
+            r"create-skill",
+            r"skill-creator",
+            r"skill-installer",
+        ],
+        "score_multiplier": 2.0,
+        "min_boost": 3.0,
+        "suggested_mode": "auto-load",
+    },
+]
+
+FORCE_DISCOVER_PATTERNS: list[str] = [
+    r"\bfind (a )?skill\b",
+    r"\bnpx skills\b",
+    r"\bskills\.sh\b",
+    r"\btem skill (para|de)\b",
+    r"\binstalar skill\b",
+    r"\bis there a skill\b",
+    r"\bdiscover (agent )?skills\b",
 ]
 
 BYPASS_PATTERNS = [
@@ -93,6 +124,12 @@ def is_bypass_task(task: str) -> bool:
     if not task_lower:
         return False
     return matches_any_pattern(task_lower, BYPASS_PATTERNS)
+
+
+def is_force_discover(task: str) -> bool:
+    if is_bypass_task(task):
+        return False
+    return matches_any_pattern(task, FORCE_DISCOVER_PATTERNS)
 
 
 def task_intents(task: str) -> list[dict[str, Any]]:

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "skill_count": 6,
+  "skill_count": 7,
   "skills": [
     {
       "name": "superdesign",
@@ -50,6 +50,16 @@
       "domain": "web",
       "path": "/tmp/skills/react-best-practices/SKILL.md",
       "scope": "personal",
+      "installed": true
+    },
+    {
+      "name": "find-skills",
+      "folder": "find-skills",
+      "description": "Discover and install agent skills from the open skills ecosystem via npx skills",
+      "tags": ["skills", "discover", "install"],
+      "domain": "meta",
+      "path": "/tmp/skills/find-skills/SKILL.md",
+      "scope": "agents",
       "installed": true
     },
     {

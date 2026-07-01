@@ -30,9 +30,9 @@ Orchestrate local Cursor skills. Maestro does **not** implement work itself — 
 | `~/.cursor/skills-manifest.json` | Searchable catalog (regenerate with build_manifest) |
 | `~/.cursor/maestro-exclude.txt` | Skills banned from search |
 | `scripts/build_manifest.py` | Regenerate manifest (tags + `~/.agents/skills`) |
-| `scripts/search_skills.py` | Hybrid BM25 search + routing P0-P3 |
+| `scripts/search_skills.py` | Hybrid BM25 search + routing P0-P3 + `discover` |
 | `scripts/route_tasks.py` | Batch route decomposed sub-tasks |
-| `community.yaml` | Missing-skill hints for not-installed workflows |
+| `scripts/concept_gaps.py` | Detect concepts in prompt without local skill coverage |
 
 ## Workflow
 
@@ -54,9 +54,50 @@ py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search_skills.py" "<user pro
 
 Optional: `--domain web|data-viz|analytics|design|creative|devops-git|video-media|integrations|security|meta|general`
 
-JSON includes `routing` (P0-P3), `confidence`, `mode`, `missing_skills`, `intent_boosts`.
+JSON includes `routing` (P0-P3), `confidence`, `mode`, `discover`, `intent_boosts`.
+
+Read `discover` before building the graph:
+
+| `discover.triggered` | Meaning |
+|----------------------|---------|
+| `true` | Open a **Discover** branch via `find-skills` (see below) |
+| `false` | Proceed with installed skills only |
+
+**Discover reasons:** `force_discover` (explicit “find skill”), `weak_match`, `single_local_skill`, `concept_gap` (e.g. prompt mentions `skeleton-loader` with no local skill).
 
 Follow `routing.priority` and `routing.decision`; use `results` as evidence.
+
+### 2a. Discover branch (`discover.triggered: true`)
+
+When the JSON signals discover, run **before presenting Graph 1**:
+
+```bash
+npx skills find "<query from discover.queries[0]>"
+```
+
+Repeat for each entry in `discover.queries` (max 2 concept gaps; extra gaps appear in `discover.gap_notes` as graph notes).
+
+**Graph 1 — pré-discover** (wait for user **ok**):
+
+| # | Nó | Skills | Depende de | Subagente |
+|---|-----|--------|------------|-----------|
+| 1 | Discover `<gap>` | `find-skills` | — | generalPurpose |
+| | → candidata: `owner/repo@skill` (installs) | | | |
+| 2 | Fallback local | `<discover.local_fallback>` | 1 (se discover falhar) | generalPurpose |
+| 3 | Executar tarefa | `<instalada ou #2>` | 1 ou 2 | generalPurpose |
+
+After user confirms Graph 1, spawn `find-skills` subagent to install:
+
+```bash
+npx skills add <owner/repo@skill> -g -a cursor -y
+py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\build_manifest.py" --project-root "<workspace-root>"
+```
+
+Re-run search with the original prompt. Present **Graph 2 — pós-discover** and wait for a **second ok** before execution subagents.
+
+**If `npx skills find` returns nothing:** Graph 2 uses `discover.local_fallback` only + note about `npx skills init`. If no fallback either, stop and ask the user how to proceed.
+
+**If match is strong and `discover.triggered: false`:** skip Discover; single graph as usual.
 
 ### 2b. Refine graph nodes (after draft decomposition)
 
@@ -64,7 +105,7 @@ Follow `routing.priority` and `routing.decision`; use `results` as evidence.
 printf '%s\n' "<task 1>" "<task 2>" | py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\route_tasks.py" --json
 ```
 
-Merge router output into the graph: prefer installed `path` when `mode` is `auto-load`; surface `missing_skills` with `install_hint` when useful.
+Merge router output into the graph: prefer installed `path` when `mode` is `auto-load`; honor `discover` flags from each task.
 
 Para tarefas com codigo versionado, inclua no grafo nos de implementacao, git e sintese:
 
@@ -76,7 +117,9 @@ Leia `docs/github-workflow.md` (neste repo ou copiado para o projeto) quando a t
 
 ### 3. Handle weak matches
 
-If `weak_match: true` in JSON:
+If `weak_match: true` and `discover.triggered: true`, prefer the **Discover branch** (step 2a) instead of only asking domain.
+
+If `weak_match: true` and `discover.triggered: false`:
 
 - **`low_top_score` / `tight_spread` / `no_results`** → ask domain in one line:
 
@@ -199,6 +242,12 @@ cp templates/CONTRIBUTING.md <seu-projeto>/
 - `data-visualization` / `build-web-data-visualization-data-visualization` — viz router
 
 ## Examples
+
+**User:** `$maestro vamos colocar skeleton-loader na UI`
+
+1. Search → `discover.triggered` (`concept_gap: skeleton-loader`); local UI skills as fallback
+2. `npx skills find "skeleton-loader ui web"` → candidata no Grafo 1
+3. User ok → find-skills installs → rebuild manifest → Grafo 2 → user ok → implement
 
 **User:** `$maestro corrigir CI quebrado no PR`
 

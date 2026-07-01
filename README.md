@@ -11,7 +11,7 @@ Meta-orquestrador de **skills para Cursor**: descobre skills locais, monta um gr
 
 | Pasta | Conteúdo |
 |-------|----------|
-| `skills/maestro/` | Skill Cursor + scripts Python + `community.yaml` |
+| `skills/maestro/` | Skill Cursor + scripts Python |
 | `tests/` | Testes automatizados do motor de busca |
 | `docs/` | Fluxo GitHub genérico reutilizável |
 | `templates/` | Issue templates, PR template e workflows para copiar em outros projetos |
@@ -20,7 +20,7 @@ Meta-orquestrador de **skills para Cursor**: descobre skills locais, monta um gr
 
 - **Python 3.12+** (mesma versão do CI)
 - **Cursor** com skills em `~/.cursor/skills` e/ou `~/.agents/skills`
-- **PyYAML** (opcional) — melhora leitura de `community.yaml`; sem ele, usa parser embutido
+- **Node.js** (opcional) — para `npx skills find` no ramo Discover via `find-skills`
 
 ## Instalação
 
@@ -60,7 +60,7 @@ py -3 ~/.cursor/skills/maestro/scripts/build_manifest.py --project-root /caminho
 py -3 ~/.cursor/skills/maestro/scripts/search_skills.py "criar dashboard react" --json
 ```
 
-Retorna `routing` (P0–P3), `confidence`, `mode`, `missing_skills`, `intent_boosts`.
+Retorna `routing` (P0–P3), `confidence`, `mode`, `discover`, `intent_boosts`.
 
 ### 3. Rotear sub-tarefas (após decompor o grafo)
 
@@ -73,10 +73,11 @@ printf '%s\n' "design UI" "fix CI" | py -3 ~/.cursor/skills/maestro/scripts/rout
 ```text
 Prompt do usuário
     → build_manifest.py (índice local, com tags)
-    → search_skills.py (BM25 + sinônimos + intents + routing)
-    → grafo editável (você confirma)
-    → route_tasks.py por sub-tarefa (opcional)
-    → subagentes com SKILL.md explícito
+    → search_skills.py (BM25 + sinônimos + intents + concept gaps + discover)
+    → npx skills find (se discover.triggered)
+    → grafo 1 editável (você confirma)
+    → find-skills install + build_manifest (se discover)
+    → grafo 2 editável (segundo ok)
 ```
 
 ## Testes
@@ -108,7 +109,6 @@ maestro/
 ├── scripts/sync-templates.ps1
 ├── skills/maestro/
 │   ├── SKILL.md
-│   ├── community.yaml
 │   └── scripts/
 ├── tests/
 └── templates/
