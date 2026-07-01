@@ -1,0 +1,47 @@
+{
+  "name": "maestro-skills",
+  "version": "0.1.0",
+  "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
+  "license": "MIT",
+  "author": "Yuri Rodovalho",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rodovalhofs/maestro.git",
+    "directory": "packages/maestro-skills"
+  },
+  "homepage": "https://github.com/rodovalhofs/maestro#installation",
+  "bugs": {
+    "url": "https://github.com/rodovalhofs/maestro/issues"
+  },
+  "keywords": [
+    "maestro",
+    "cursor",
+    "claude",
+    "codex",
+    "agent-skills",
+    "skills",
+    "orchestrator"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "maestro-skills": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skill",
+    "agents.json",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/sync-skill-to-cli.mjs",
+    "test": "node --test test/agents.test.js"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.1",
+    "commander": "^13.1.0"
+  }
+}

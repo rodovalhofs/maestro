@@ -1,0 +1,33 @@
+{
+  "name": "@rodovalhofs/maestro",
+  "version": "0.1.0",
+  "description": "Maestro skill orchestrator — scoped install with short bin name",
+  "license": "MIT",
+  "author": "Yuri Rodovalho",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rodovalhofs/maestro.git",
+    "directory": "packages/rodovalhofs-maestro"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "maestro": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skill",
+    "agents.json",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/sync-skill-to-cli.mjs --target rodovalhofs-maestro"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.1",
+    "commander": "^13.1.0"
+  }
+}

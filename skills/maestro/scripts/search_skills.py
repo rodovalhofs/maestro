@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -23,10 +22,19 @@ from routing import (  # noqa: E402
     is_high_risk,
     select_mode,
 )
+from maestro_paths import LEGACY_MANIFEST_PATH, MANIFEST_PATH  # noqa: E402
 from synonyms import expand_query  # noqa: E402
 
-CURSOR_HOME = Path(os.environ.get("CURSOR_HOME", Path.home() / ".cursor"))
-DEFAULT_MANIFEST = CURSOR_HOME / "skills-manifest.json"
+
+def default_manifest_path() -> Path:
+    if MANIFEST_PATH.is_file():
+        return MANIFEST_PATH
+    if LEGACY_MANIFEST_PATH.is_file():
+        return LEGACY_MANIFEST_PATH
+    return MANIFEST_PATH
+
+
+DEFAULT_MANIFEST = default_manifest_path()
 WEAK_SCORE_THRESHOLD = 1.5
 WEAK_SPREAD_RATIO = 0.10
 DEFAULT_MAX_RESULTS = 5
