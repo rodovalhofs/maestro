@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -15,12 +14,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from domains import classify_skill  # noqa: E402
+from maestro_paths import (  # noqa: E402
+    EXCLUDE_PATH,
+    MANIFEST_PATH,
+    all_skill_roots,
+)
 
-CURSOR_HOME = Path(os.environ.get("CURSOR_HOME", Path.home() / ".cursor"))
-PERSONAL_SKILLS = CURSOR_HOME / "skills"
-AGENTS_SKILLS = Path.home() / ".agents" / "skills"
-MANIFEST_PATH = CURSOR_HOME / "skills-manifest.json"
-EXCLUDE_PATH = CURSOR_HOME / "maestro-exclude.txt"
 MAESTRO_NAMES = {"maestro"}
 
 
@@ -142,21 +141,24 @@ def iter_skill_dirs(root: Path, scope: str) -> list[dict]:
 
 def build_manifest(project_root: Path | None) -> dict:
     skills: list[dict] = []
-    skills.extend(iter_skill_dirs(PERSONAL_SKILLS, "personal"))
-    skills.extend(iter_skill_dirs(AGENTS_SKILLS, "agents"))
-    if project_root:
-        project_skills = project_root / ".cursor" / "skills"
-        skills.extend(iter_skill_dirs(project_skills, "project"))
+    scanned_roots: list[dict[str, str]] = []
+
+    for root, scope in all_skill_roots(project_root):
+        scanned_roots.append(
+            {"path": str(root).replace("\\", "/"), "scope": scope}
+        )
+        skills.extend(iter_skill_dirs(root, scope))
 
     dedup: dict[str, dict] = {}
     for skill in skills:
-        dedup[skill["folder"]] = skill
+        key = f"{skill['scope']}:{skill['folder']}"
+        dedup[key] = skill
 
     return {
-        "version": 2,
+        "version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "personal_skills_root": str(PERSONAL_SKILLS).replace("\\", "/"),
-        "agents_skills_root": str(AGENTS_SKILLS).replace("\\", "/"),
+        "maestro_home": str(MANIFEST_PATH.parent).replace("\\", "/"),
+        "scanned_roots": scanned_roots,
         "skill_count": len(dedup),
         "skills": sorted(dedup.values(), key=lambda s: (s["domain"], s["name"])),
     }
@@ -164,7 +166,7 @@ def build_manifest(project_root: Path | None) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build maestro skills manifest")
-    parser.add_argument("--project-root", default=None, help="Project root with .cursor/skills")
+    parser.add_argument("--project-root", default=None, help="Project root with agent skills dirs")
     parser.add_argument("--output", default=str(MANIFEST_PATH), help="Manifest output path")
     args = parser.parse_args()
 

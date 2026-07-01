@@ -9,5 +9,6 @@ __pycache__/
 credentials.json
 skills-manifest.json
 .DS_Store
-Thumbs.db
-*.log
+node_modules/
+packages/**/node_modules/
+packages/**/skill/

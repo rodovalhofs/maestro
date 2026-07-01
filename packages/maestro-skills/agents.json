@@ -1,0 +1,36 @@
+{
+  "agents": [
+    {
+      "id": "cursor",
+      "label": "Cursor",
+      "globalSkillsDir": ".cursor/skills",
+      "projectSkillsDir": ".cursor/skills",
+      "detectDirs": [".cursor"],
+      "skillsCliAgent": "cursor"
+    },
+    {
+      "id": "claude",
+      "label": "Claude Code",
+      "globalSkillsDir": ".claude/skills",
+      "projectSkillsDir": ".claude/skills",
+      "detectDirs": [".claude"],
+      "skillsCliAgent": "claude"
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "globalSkillsDir": ".codex/skills",
+      "projectSkillsDir": ".codex/skills",
+      "detectDirs": [".codex"],
+      "skillsCliAgent": "codex"
+    },
+    {
+      "id": "universal",
+      "label": "Universal (~/.agents/skills)",
+      "globalSkillsDir": ".agents/skills",
+      "projectSkillsDir": ".agents/skills",
+      "detectDirs": [".agents"],
+      "skillsCliAgent": null
+    }
+  ]
+}

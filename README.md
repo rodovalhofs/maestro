@@ -3,7 +3,7 @@
 [![CI](https://github.com/rodovalhofs/maestro/actions/workflows/ci.yml/badge.svg)](https://github.com/rodovalhofs/maestro/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Maestro** é um meta-orquestrador de skills para o Cursor. Você descreve a tarefa; ele descobre quais skills locais usar, monta um **grafo de dependências editável**, pede sua confirmação e só então dispara subagentes com os `SKILL.md` certos.
+**Maestro** é um meta-orquestrador de skills para agentes de IA (Cursor, Claude Code, Codex e outros). Você descreve a tarefa; ele descobre quais skills locais usar, monta um **grafo de dependências editável**, pede sua confirmação e só então dispara subagentes com os `SKILL.md` certos.
 
 Se faltar skill no ecossistema (ex.: `skeleton-loader`), o Maestro abre o ramo **Discover** via [find-skills](https://skills.sh/) (`npx skills find`), instala, regenera o índice e roteia de novo.
 
@@ -34,7 +34,7 @@ O Maestro responde: *“Para esta tarefa, quais skills devo usar, em que ordem, 
 Seu prompt
     │
     ▼
-build_manifest.py          ← índice local (~/.cursor/skills-manifest.json)
+build_manifest.py          ← índice local (~/.maestro/skills-manifest.json)
     │
     ▼
 search_skills.py             ← BM25 + intents + sinônimos + concept gaps
@@ -75,52 +75,56 @@ Máximo de **2** gaps por prompt; extras viram nota no grafo para você editar.
 
 ## Instalação
 
-### Opção A — `npx skills` (recomendado)
+### Opção A — `npx maestro-skills setup` (recomendado)
 
-Requer [Node.js](https://nodejs.org/). Instala a skill no Cursor globalmente:
-
-```bash
-npx skills add rodovalhofs/maestro --skill maestro -g -a cursor -y
-```
-
-| Flag | Significado |
-|------|-------------|
-| `--skill maestro` | Só a skill Maestro (o repo tem uma) |
-| `-g` | Global (`~/.cursor/skills`) |
-| `-a cursor` | Destino: Cursor |
-| `-y` | Sem prompts interativos |
-
-**Windows (PowerShell):**
-
-```powershell
-npx skills add rodovalhofs/maestro --skill maestro -g -a cursor -y
-```
-
-**Verificar instalação:**
+Setup interativo — escolha agentes e escopo (global ou projeto):
 
 ```bash
-npx skills list
+npx maestro-skills setup
 ```
 
-**Catálogo público:** após installs, a skill pode aparecer em [skills.sh/rodovalhofs/maestro](https://skills.sh/rodovalhofs/maestro).
+| Agente | Pasta | Flag |
+|--------|-------|------|
+| Cursor | `~/.cursor/skills/maestro` | `--cursor` |
+| Claude Code | `~/.claude/skills/maestro` | `--claude` |
+| Codex | `~/.codex/skills/maestro` | `--codex` |
+| Universal | `~/.agents/skills/maestro` | `--universal` |
 
-### Opção B — Git clone (manual)
+Exemplos:
+
+```bash
+npx maestro-skills setup --codex --cursor -y    # Codex + Cursor, sem prompts
+npx maestro-skills setup --project              # só o repo atual
+npx @rodovalhofs/maestro setup                  # fallback (bin curto)
+```
+
+Documentação completa: [docs/maestro-skills-cli.md](docs/maestro-skills-cli.md)
+
+### Opção B — `npx skills add` (catálogo skills.sh)
+
+```bash
+npx skills add rodovalhofs/maestro --skill maestro -g -a cursor -a codex -y
+```
+
+### Opção C — Git clone (manual)
 
 ```powershell
 # Windows
 git clone https://github.com/rodovalhofs/maestro.git
 Copy-Item -Recurse -Force maestro\skills\maestro $env:USERPROFILE\.cursor\skills\maestro
+# ou: $env:USERPROFILE\.codex\skills\maestro
 ```
 
 ```bash
 # macOS / Linux
 git clone https://github.com/rodovalhofs/maestro.git
 cp -r maestro/skills/maestro ~/.cursor/skills/maestro
+# ou: ~/.codex/skills/maestro
 ```
 
 ### Pós-instalação (obrigatório)
 
-Indexe suas skills locais para o Maestro poder buscar:
+Indexe suas skills locais (todos os agentes):
 
 ```bash
 # Windows
@@ -130,7 +134,7 @@ py -3 %USERPROFILE%\.cursor\skills\maestro\scripts\build_manifest.py --project-r
 python3 ~/.cursor/skills/maestro/scripts/build_manifest.py --project-root .
 ```
 
-Rode de novo sempre que instalar ou remover skills.
+Manifest gerado em `~/.maestro/skills-manifest.json`.
 
 ### Opcional — excluir skills da busca
 

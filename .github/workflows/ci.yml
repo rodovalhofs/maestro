@@ -15,4 +15,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/sync-skill-to-cli.mjs
       - run: python -m unittest discover -s tests -v
+      - run: npm install
+        working-directory: packages/maestro-skills
+      - run: npm test
+        working-directory: packages/maestro-skills
