@@ -8,7 +8,7 @@ Instalação interativa do Maestro para vários agentes de IA.
 npx maestro-skills setup
 ```
 
-Pacote npm: [maestro-skills@0.1.1](https://www.npmjs.com/package/maestro-skills)
+Pacote npm: [maestro-skills@0.1.2](https://www.npmjs.com/package/maestro-skills)
 
 Alternativa scoped (bin `maestro`):
 

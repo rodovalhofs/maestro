@@ -1,6 +1,6 @@
 {
   "name": "@rodovalhofs/maestro",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Maestro skill orchestrator — scoped install with short bin name",
   "license": "MIT",
   "author": "Yuri Rodovalho",

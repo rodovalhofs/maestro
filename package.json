@@ -1,6 +1,6 @@
 {
   "name": "maestro-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
   "author": "Yuri Rodovalho",
@@ -8,10 +8,11 @@
     "type": "git",
     "url": "git+https://github.com/rodovalhofs/maestro.git"
   },
-  "homepage": "https://github.com/rodovalhofs/maestro#installation",
+  "homepage": "https://github.com/rodovalhofs/maestro#readme",
   "bugs": {
     "url": "https://github.com/rodovalhofs/maestro/issues"
   },
+  "private": true,
   "type": "module",
   "engines": {
     "node": ">=18"
@@ -21,6 +22,7 @@
   },
   "scripts": {
     "prepare": "node scripts/sync-skill-to-cli.mjs",
+    "prepublishOnly": "node -e \"console.error('Publish only from packages/maestro-skills (npm run publish:cli)'); process.exit(1)\"",
     "test:py": "python -m unittest discover -s tests -v",
     "test:js": "npm test --prefix packages/maestro-skills",
     "test": "npm run test:py && npm run test:js",
@@ -30,6 +32,5 @@
   "dependencies": {
     "@clack/prompts": "^0.10.1",
     "commander": "^13.1.0"
-  },
-  "private": false
+  }
 }

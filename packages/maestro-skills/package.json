@@ -1,6 +1,6 @@
 {
   "name": "maestro-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
   "author": "Yuri Rodovalho",
@@ -38,7 +38,7 @@
   ],
   "scripts": {
     "prepack": "node ../../scripts/sync-skill-to-cli.mjs",
-    "test": "node --test test/agents.test.js"
+    "test": "node --test test/"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.1",
