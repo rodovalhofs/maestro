@@ -12,3 +12,4 @@ skills-manifest.json
 node_modules/
 packages/**/node_modules/
 packages/**/skill/
+package-lock.json
