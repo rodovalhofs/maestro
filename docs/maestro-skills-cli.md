@@ -1,22 +1,16 @@
 # CLI `maestro-skills`
 
-Instalação interativa do Maestro para vários agentes de IA — um comando, escolha onde instalar.
+Instalação interativa do Maestro para vários agentes de IA.
 
 ## Comando principal
-
-**GitHub (funciona sem publicar no npm):**
-
-```bash
-npx github:rodovalhofs/maestro maestro-skills setup
-```
-
-**npm registry** (após `maestro-skills@0.1.1` publicado):
 
 ```bash
 npx maestro-skills setup
 ```
 
-Equivalente scoped (bin `maestro`):
+Pacote npm: [maestro-skills@0.1.1](https://www.npmjs.com/package/maestro-skills)
+
+Alternativa scoped (bin `maestro`):
 
 ```bash
 npx @rodovalhofs/maestro setup
@@ -41,24 +35,14 @@ npx @rodovalhofs/maestro setup
 | `codex` | Codex | `~/.codex/skills/maestro` | `--codex` |
 | `universal` | Universal | `~/.agents/skills/maestro` | `--universal` |
 
-Novos agentes podem ser adicionados em `packages/maestro-skills/agents.json` sem alterar o core do CLI.
+Novos agentes: edite `packages/maestro-skills/agents.json`.
 
 ## Comandos
 
 ```bash
-# Setup interativo (recomendado)
 npx maestro-skills setup
-
-# Só Codex, global, sem prompts
-npx maestro-skills setup --codex -y
-
-# Vários agentes
-npx maestro-skills setup --cursor --claude --codex -y
-
-# Apenas o repositório atual
+npx maestro-skills setup --codex --cursor -y
 npx maestro-skills setup --project
-
-# Desinstalar
 npx maestro-skills remove
 npx maestro-skills remove -y --clean-home
 ```
@@ -67,47 +51,32 @@ npx maestro-skills remove -y --clean-home
 
 ```text
 ~/.maestro/
-├── skills-manifest.json   # índice único (todos os agentes)
-├── maestro-exclude.txt    # skills ignoradas na busca
-└── config.json            # último setup (destinos, escopo)
+├── skills-manifest.json
+├── maestro-exclude.txt
+└── config.json
 ```
 
-O `build_manifest.py` indexa skills de:
-
-- `~/.cursor/skills`
-- `~/.claude/skills`
-- `~/.codex/skills`
-- `~/.agents/skills`
-- `.cursor/skills`, `.claude/skills`, `.codex/skills`, `.agents/skills` do `--project-root`
+O `build_manifest.py` indexa skills de `~/.cursor`, `~/.claude`, `~/.codex`, `~/.agents` e pastas de projeto.
 
 ## Pré-requisitos
 
-- **Node.js 18+** — para o CLI
-- **Python 3.12+** — para gerar o manifest (`py -3` ou `python3`)
+- **Node.js 18+** — CLI
+- **Python 3.12+** — manifest (`py -3` ou `python3`)
 
 ## Desenvolvimento
 
 ```bash
-# Sincronizar skill canônica → pacotes npm
 node scripts/sync-skill-to-cli.mjs
-
-# Testes Python
 py -3 -m unittest discover -s tests -v
-
-# Testes Node
 cd packages/maestro-skills && npm test
 ```
 
-## Publicação npm
-
-O pacote `maestro-skills` precisa ser publicado uma vez para `npx maestro-skills` funcionar sem GitHub.
+## Publicação npm (mantenedores)
 
 ```bash
 npm login
-npm run publish:cli    # maestro-skills
-npm run publish:scoped # @rodovalhofs/maestro
+npm run publish:cli
+npm run publish:scoped
 ```
 
-Ou dispare o workflow **Publish npm** no GitHub Actions (secret `NPM_TOKEN`).
-
-Não inclua tokens, `.env` ou credenciais nos pacotes.
+Ou workflow **Publish npm** com secret `NPM_TOKEN`.

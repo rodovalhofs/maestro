@@ -9,7 +9,7 @@
     "url": "git+https://github.com/rodovalhofs/maestro.git",
     "directory": "packages/maestro-skills"
   },
-  "homepage": "https://github.com/rodovalhofs/maestro#installation",
+  "homepage": "https://github.com/rodovalhofs/maestro#readme",
   "bugs": {
     "url": "https://github.com/rodovalhofs/maestro/issues"
   },
