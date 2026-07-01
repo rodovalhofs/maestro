@@ -17,7 +17,7 @@ Obrigado pelo interesse no Maestro. Este projeto é open source (MIT).
 
 - Melhorias no ranking (intents, sinônimos, domínios)
 - Novos casos de teste com fixtures
-- Documentação e exemplos em `community.yaml`
+- Documentação e exemplos no README / SKILL.md
 - Traduções ou clareza no README
 
 ## Estilo de código

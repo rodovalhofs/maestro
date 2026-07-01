@@ -28,6 +28,6 @@ Objetivo de resposta inicial: **7 dias úteis**.
 
 ## Boas práticas para quem instala
 
-- Revise `community.yaml` antes de confiar em `install_hint` de skills sugeridas.
+- Revise pacotes retornados por `npx skills find` antes de instalar (`npx skills add`).
 - Use `~/.cursor/maestro-exclude.txt` para excluir skills sensíveis da busca.
 - O script `scripts/sync-templates.ps1` **sobrescreve** `.github/` no repositório destino — confira o `-TargetRepo` antes de executar.

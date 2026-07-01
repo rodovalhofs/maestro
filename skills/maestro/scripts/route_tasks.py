@@ -17,22 +17,27 @@ from search_skills import DEFAULT_MANIFEST, load_manifest, search_skills  # noqa
 def route_batch(
     tasks: list[str],
     manifest_path: Path,
-    community_path: Path | None = None,
 ) -> dict:
     manifest = load_manifest(manifest_path)
     results = [
-        search_skills(task.strip(), manifest, community_path=community_path)
+        search_skills(task.strip(), manifest)
         for task in tasks
         if task.strip()
     ]
 
-    missing_by_skill: dict[str, dict] = {}
+    all_gaps: list[str] = []
+    all_gap_notes: list[str] = []
+    discover_triggered = False
     for result in results:
-        for missing in result.get("missing_skills", []):
-            name = missing["skill"]
-            current = missing_by_skill.get(name)
-            if current is None or missing["confidence"] > current["confidence"]:
-                missing_by_skill[name] = missing
+        discover = result.get("discover", {})
+        if discover.get("triggered"):
+            discover_triggered = True
+        for gap in discover.get("gaps", []):
+            if gap not in all_gaps:
+                all_gaps.append(gap)
+        for note in discover.get("gap_notes", []):
+            if note not in all_gap_notes:
+                all_gap_notes.append(note)
 
     priorities = [r.get("routing", {}).get("priority", "P3") for r in results]
     if "P0" in priorities:
@@ -53,7 +58,11 @@ def route_batch(
             "report_policy": "report" if batch_priority == "P0" else "silent",
         },
         "results": results,
-        "missing_skills": list(missing_by_skill.values()),
+        "discover": {
+            "triggered": discover_triggered,
+            "gaps": all_gaps,
+            "gap_notes": all_gap_notes,
+        },
     }
 
 
@@ -65,7 +74,6 @@ def main() -> int:
         help="Task strings; omit and use stdin for batch mode",
     )
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
-    parser.add_argument("--community", default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -74,8 +82,7 @@ def main() -> int:
     else:
         tasks = [line.strip() for line in sys.stdin if line.strip()]
 
-    community_path = Path(args.community) if args.community else None
-    payload = route_batch(tasks, Path(args.manifest), community_path)
+    payload = route_batch(tasks, Path(args.manifest))
 
     if args.json or not sys.stdout.isatty():
         print(json.dumps(payload, indent=2, ensure_ascii=False))

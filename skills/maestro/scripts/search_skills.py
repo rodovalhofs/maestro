@@ -14,11 +14,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from bm25 import BM25  # noqa: E402
-from community import community_document, load_community_mapping  # noqa: E402
+from concept_gaps import build_discover_queries, find_concept_gaps  # noqa: E402
 from domains import DOMAINS, HUB_SKILLS, classify_query, domain_label  # noqa: E402
-from intents import apply_intent_boost, is_bypass_task, task_intents  # noqa: E402
+from intents import apply_intent_boost, is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import (  # noqa: E402
-    OPTIONAL_LOAD_CONFIDENCE,
     bm25_to_confidence,
     build_routing,
     is_high_risk,
@@ -50,54 +49,66 @@ def skill_document(skill: dict[str, Any]) -> str:
     )
 
 
-def find_missing_skills(
+def build_discover(
     query: str,
-    expanded_query: str,
-    installed_names: set[str],
-    community: dict[str, dict[str, Any]],
-    max_results: int = 3,
-) -> list[dict[str, Any]]:
-    if not community:
-        return []
+    results: list[dict[str, Any]],
+    pool: list[dict[str, Any]],
+    *,
+    weak: bool,
+    force_discover: bool,
+    bypass: bool,
+    domain: str,
+) -> dict[str, Any]:
+    if bypass:
+        return {
+            "triggered": False,
+            "reasons": [],
+            "force_discover": False,
+            "gaps": [],
+            "gap_notes": [],
+            "queries": [],
+            "local_fallback": None,
+        }
 
-    entries: list[tuple[str, dict[str, Any], str]] = []
-    for name, meta in community.items():
-        if name in installed_names:
-            continue
-        entries.append((name, meta, community_document(name, meta)))
+    gaps, gap_notes = find_concept_gaps(
+        query, results, pool, skill_document, expand_query
+    )
 
-    if not entries:
-        return []
+    reasons: list[str] = []
+    if force_discover:
+        reasons.append("force_discover")
+    if weak:
+        reasons.append("weak_match")
+    if len(results) == 1 and (
+        weak or results[0]["score"] < WEAK_SCORE_THRESHOLD
+    ):
+        reasons.append("single_local_skill")
+    if gaps:
+        reasons.append("concept_gap")
 
-    documents = [doc for _, _, doc in entries]
-    bm25 = BM25()
-    bm25.fit(documents)
-    ranked = bm25.score(expanded_query or query)
+    triggered = bool(reasons)
+    queries: list[str] = []
+    if gaps:
+        queries = build_discover_queries(gaps, query, domain)
+    elif triggered:
+        queries = [query]
 
-    missing: list[dict[str, Any]] = []
-    for idx, score in ranked:
-        if score <= 0:
-            continue
-        name, meta, _ = entries[idx]
-        confidence = bm25_to_confidence(score)
-        if confidence < OPTIONAL_LOAD_CONFIDENCE:
-            continue
-        missing.append(
-            {
-                "skill": name,
-                "installed": False,
-                "path": "",
-                "confidence": round(confidence, 3),
-                "mode": "recommend",
-                "install_hint": meta.get(
-                    "install",
-                    f"Install the '{name}' skill, then regenerate the manifest.",
-                ),
-            }
-        )
-        if len(missing) >= max_results:
-            break
-    return missing
+    local_fallback: dict[str, str] | None = None
+    if results:
+        local_fallback = {
+            "name": str(results[0]["name"]),
+            "path": str(results[0].get("path", "")),
+        }
+
+    return {
+        "triggered": triggered,
+        "reasons": reasons,
+        "force_discover": force_discover,
+        "gaps": gaps,
+        "gap_notes": gap_notes,
+        "queries": queries,
+        "local_fallback": local_fallback,
+    }
 
 
 def search_skills(
@@ -106,7 +117,6 @@ def search_skills(
     domain: str | None = None,
     max_results: int = DEFAULT_MAX_RESULTS,
     include_hubs: bool = True,
-    community_path: Path | None = None,
 ) -> dict:
     skills = manifest.get("skills", [])
     if not skills:
@@ -114,9 +124,9 @@ def search_skills(
 
     bypass = is_bypass_task(query)
     high_risk = is_high_risk(query)
+    force_discover = is_force_discover(query)
     intents = task_intents(query)
     expanded_query = expand_query(query)
-    installed_names = {s["name"] for s in skills}
 
     detected_domain, domain_scores = classify_query(query)
     active_domain = domain or detected_domain
@@ -162,28 +172,33 @@ def search_skills(
     results.sort(key=lambda item: item["score"], reverse=True)
     results = results[:max_results]
 
-    community = load_community_mapping(community_path)
-    missing_skills = find_missing_skills(
-        query, expanded_query, installed_names, community
-    )
-
     routing = build_routing(query, results, high_risk, bypass=bypass)
 
     weak = False
-    reason: list[str] = []
+    weak_reasons: list[str] = []
     if not results and not bypass:
         weak = True
-        reason.append("no_results")
+        weak_reasons.append("no_results")
     elif results:
         top = results[0]["score"]
         if top < WEAK_SCORE_THRESHOLD:
             weak = True
-            reason.append("low_top_score")
+            weak_reasons.append("low_top_score")
         if len(results) >= 3:
             third = results[2]["score"]
             if top > 0 and (top - third) / top < WEAK_SPREAD_RATIO:
                 weak = True
-                reason.append("tight_spread")
+                weak_reasons.append("tight_spread")
+
+    discover = build_discover(
+        query,
+        results,
+        pool,
+        weak=weak,
+        force_discover=force_discover,
+        bypass=bypass,
+        domain=active_domain,
+    )
 
     return {
         "query": query,
@@ -194,12 +209,12 @@ def search_skills(
         "domain_scores": domain_scores,
         "available_domains": DOMAINS,
         "weak_match": weak,
-        "weak_reasons": reason,
+        "weak_reasons": weak_reasons,
         "high_risk": high_risk,
         "routing": routing,
         "count": len(results),
         "results": results,
-        "missing_skills": missing_skills,
+        "discover": discover,
     }
 
 
@@ -217,6 +232,14 @@ def format_text(payload: dict) -> str:
     if payload.get("weak_reasons"):
         lines.append(f"Weak reasons: {', '.join(payload['weak_reasons'])}")
 
+    discover = payload.get("discover", {})
+    if discover.get("triggered"):
+        lines.append(f"Discover: {', '.join(discover.get('reasons', []))}")
+        if discover.get("gaps"):
+            lines.append(f"Concept gaps: {', '.join(discover['gaps'])}")
+        if discover.get("queries"):
+            lines.append(f"Find queries: {', '.join(discover['queries'])}")
+
     lines.append("")
     for i, skill in enumerate(payload.get("results", []), 1):
         lines.append(
@@ -224,13 +247,6 @@ def format_text(payload: dict) -> str:
             f"confidence={skill.get('confidence')}, mode={skill.get('mode')})"
         )
         lines.append(f"   path: {skill['path']}")
-
-    for missing in payload.get("missing_skills", []):
-        lines.append("")
-        lines.append(
-            f"Missing: {missing['skill']} (confidence={missing.get('confidence')})"
-        )
-        lines.append(f"   hint: {missing.get('install_hint')}")
 
     return "\n".join(lines)
 
@@ -241,18 +257,15 @@ def main() -> int:
     parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS)
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
-    parser.add_argument("--community", default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    community_path = Path(args.community) if args.community else None
     manifest = load_manifest(Path(args.manifest))
     payload = search_skills(
         args.query,
         manifest,
         domain=args.domain,
         max_results=args.max_results,
-        community_path=community_path,
     )
 
     if args.json:
