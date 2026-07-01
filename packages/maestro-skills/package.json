@@ -38,6 +38,7 @@
   ],
   "scripts": {
     "prepack": "node ../../scripts/sync-skill-to-cli.mjs",
+    "prepublishOnly": "node -e \"const fs=require('fs'); if(!fs.existsSync('skill/SKILL.md')){console.error('Missing skill/ — run sync-skill-to-cli'); process.exit(1)}\"",
     "test": "node --test test/"
   },
   "dependencies": {

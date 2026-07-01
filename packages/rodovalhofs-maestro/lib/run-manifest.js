@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { bundledBuildManifest, getMaestroPaths } from "./paths.js";
 
 function pythonCommand() {
@@ -14,8 +15,15 @@ function pythonCommand() {
   return null;
 }
 
-export function runBuildManifest({ projectRoot = process.cwd(), quiet = false } = {}) {
-  const script = bundledBuildManifest();
+export function runBuildManifest({
+  projectRoot = process.cwd(),
+  quiet = false,
+  installedSkillPath = null,
+} = {}) {
+  let script = bundledBuildManifest();
+  if (!existsSync(script) && installedSkillPath) {
+    script = join(installedSkillPath, "scripts", "build_manifest.py");
+  }
   if (!existsSync(script)) {
     return { ok: false, error: `build_manifest.py not found at ${script}` };
   }

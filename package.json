@@ -1,5 +1,5 @@
 {
-  "name": "maestro-skills",
+  "name": "maestro-monorepo",
   "version": "0.1.2",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
@@ -22,12 +22,11 @@
   },
   "scripts": {
     "prepare": "node scripts/sync-skill-to-cli.mjs",
-    "prepublishOnly": "node -e \"console.error('Publish only from packages/maestro-skills (npm run publish:cli)'); process.exit(1)\"",
     "test:py": "python -m unittest discover -s tests -v",
     "test:js": "npm test --prefix packages/maestro-skills",
     "test": "npm run test:py && npm run test:js",
-    "publish:cli": "node scripts/sync-skill-to-cli.mjs && npm publish --prefix packages/maestro-skills --access public",
-    "publish:scoped": "node scripts/sync-skill-to-cli.mjs && npm publish --prefix packages/rodovalhofs-maestro --access public"
+    "publish:cli": "node scripts/publish-cli.mjs",
+    "publish:scoped": "node scripts/sync-skill-to-cli.mjs && npm publish -C packages/rodovalhofs-maestro --access public"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.1",
