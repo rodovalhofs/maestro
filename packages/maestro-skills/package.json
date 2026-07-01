@@ -1,6 +1,6 @@
 {
   "name": "maestro-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
   "author": "Yuri Rodovalho",

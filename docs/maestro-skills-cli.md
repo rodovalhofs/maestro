@@ -4,6 +4,14 @@ Instalação interativa do Maestro para vários agentes de IA — um comando, es
 
 ## Comando principal
 
+**GitHub (funciona sem publicar no npm):**
+
+```bash
+npx github:rodovalhofs/maestro maestro-skills setup
+```
+
+**npm registry** (após `maestro-skills@0.1.1` publicado):
+
 ```bash
 npx maestro-skills setup
 ```
@@ -92,10 +100,14 @@ cd packages/maestro-skills && npm test
 
 ## Publicação npm
 
+O pacote `maestro-skills` precisa ser publicado uma vez para `npx maestro-skills` funcionar sem GitHub.
+
 ```bash
-node scripts/sync-skill-to-cli.mjs
-cd packages/maestro-skills && npm publish
-cd packages/rodovalhofs-maestro && npm publish --access public
+npm login
+npm run publish:cli    # maestro-skills
+npm run publish:scoped # @rodovalhofs/maestro
 ```
 
-Não inclua `.env`, tokens ou dados pessoais nos pacotes publicados.
+Ou dispare o workflow **Publish npm** no GitHub Actions (secret `NPM_TOKEN`).
+
+Não inclua tokens, `.env` ou credenciais nos pacotes.

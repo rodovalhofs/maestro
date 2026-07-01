@@ -77,7 +77,15 @@ Máximo de **2** gaps por prompt; extras viram nota no grafo para você editar.
 
 ### Opção A — `npx maestro-skills setup` (recomendado)
 
-Setup interativo — escolha agentes e escopo (global ou projeto):
+Setup interativo — escolha agentes e escopo (global ou projeto).
+
+**Se `npx maestro-skills` retornar 404**, o pacote ainda não está no npm registry — use o GitHub (funciona agora):
+
+```bash
+npx github:rodovalhofs/maestro maestro-skills setup
+```
+
+**Após publicação no npm** (v0.1.1+):
 
 ```bash
 npx maestro-skills setup
