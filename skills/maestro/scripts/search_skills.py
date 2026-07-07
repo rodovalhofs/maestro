@@ -295,7 +295,18 @@ def format_text(payload: dict) -> str:
     return "\n".join(lines)
 
 
+def configure_stdout_utf8() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles (cp1252/cp850)."""
+    if not hasattr(sys.stdout, "reconfigure"):
+        return
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        pass
+
+
 def main() -> int:
+    configure_stdout_utf8()
     parser = argparse.ArgumentParser(description="Search skills for maestro")
     parser.add_argument("query", help="User prompt to match against skills")
     parser.add_argument("--domain", default=None, choices=DOMAINS)
