@@ -14,6 +14,7 @@ sem adivinhar qual skill chamar.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](.github/workflows/ci.yml)
+[![Socket Badge](https://badge.socket.dev/npm/package/maestro-skills/0.1.3)](https://badge.socket.dev/npm/package/maestro-skills/0.1.3)
 
 <br>
 
