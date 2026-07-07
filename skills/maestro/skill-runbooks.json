@@ -2,24 +2,125 @@
   "version": 1,
   "skills": {
     "ui-ux-pro-max": {
-      "summary": "Design intelligence — run design-system search before implementing UI.",
-      "graph_hint": "Split into Preflight design-system -> Implement UI nodes.",
+      "summary": "Design intelligence for web/mobile UI. Always run --design-system before implementing visual work.",
+      "when_to_use": [
+        "New page, dashboard, landing, admin panel, or mobile screen",
+        "UI components (forms, tables, charts, navigation)",
+        "Visual refactor, accessibility review, or design-system tokens",
+        "Choosing colors, typography, layout, or interaction patterns"
+      ],
+      "skip_when": [
+        "Pure backend, API, database, or DevOps-only tasks",
+        "Performance work unrelated to the interface"
+      ],
+      "graph_hint": "Preflight design-system -> (optional) stack/domain search -> Implement UI. Read SKILL.md + preflight output.",
+      "workflow": [
+        {
+          "step": 1,
+          "title": "Analyze prompt",
+          "action": "Extract product type, audience, style keywords, and project stack (react, nextjs, shadcn, vue, etc.)."
+        },
+        {
+          "step": 2,
+          "title": "Preflight: design system (REQUIRED)",
+          "preflight_id": "design-system",
+          "action": "Parent runs CLI; attach full stdout to the implementation subagent prompt."
+        },
+        {
+          "step": 3,
+          "title": "Supplement (as needed)",
+          "action": "Run domain or stack searches before coding if the task needs extra detail (ux, chart, shadcn, etc.)."
+        },
+        {
+          "step": 4,
+          "title": "Implement UI",
+          "action": "Follow tokens from design-system output; use Quick Reference checklist in SKILL.md before delivery."
+        }
+      ],
       "preflight": [
         {
           "id": "design-system",
           "label": "Generate design system",
-          "when": "New page, dashboard, or visual refactor",
-          "command": "python",
+          "when": "Any task that changes how the UI looks, feels, or behaves",
+          "command": "py",
           "args": [
+            "-3",
             "{skill_scripts}/search.py",
             "{query}",
             "--design-system",
             "-p",
             "{project_name}"
           ],
-          "notes": "Use output tokens in the implementation subagent prompt."
+          "notes": "Windows: py -3. Unix: replace command with python3 and drop -3. Attach output to subagent prompt."
+        },
+        {
+          "id": "design-system-persist",
+          "label": "Persist design system to project",
+          "when": "Multi-session work; team shares tokens via git",
+          "command": "py",
+          "args": [
+            "-3",
+            "{skill_scripts}/search.py",
+            "{query}",
+            "--design-system",
+            "--persist",
+            "-p",
+            "{project_name}"
+          ],
+          "notes": "Creates design-system/MASTER.md and optional design-system/pages/<page>.md. Run from project root."
         }
-      ]
+      ],
+      "commands": {
+        "design_system": {
+          "required": true,
+          "template": "py -3 \"{skill_scripts}/search.py\" \"<product> <industry> <keywords>\" --design-system -p \"{project_name}\"",
+          "example": "py -3 \"{skill_scripts}/search.py\" \"internal analytics dashboard saas minimal\" --design-system -p \"ComprasPJ\"",
+          "dashboard_dials": "py -3 \"{skill_scripts}/search.py\" \"internal analytics dashboard\" --design-system --variance 8 --motion 7 --density 8 -p \"{project_name}\"",
+          "persist_page": "py -3 \"{skill_scripts}/search.py\" \"<query>\" --design-system --persist -p \"{project_name}\" --page \"dashboard\""
+        },
+        "domain_search": {
+          "template": "py -3 \"{skill_scripts}/search.py\" \"<keyword>\" --domain <domain> [-n 5]",
+          "domains": {
+            "ux": "animation, accessibility, forms, loading",
+            "style": "glassmorphism, minimalism, dark mode",
+            "color": "palettes by product type",
+            "typography": "font pairings",
+            "chart": "chart type for dashboards",
+            "landing": "hero, pricing, social proof",
+            "product": "patterns by product type",
+            "google-fonts": "specific font lookup",
+            "prompt": "CSS keywords for a style"
+          }
+        },
+        "stack": {
+          "template": "py -3 \"{skill_scripts}/search.py\" \"<keyword>\" --stack <stack>",
+          "stacks": [
+            "react",
+            "nextjs",
+            "shadcn",
+            "vue",
+            "svelte",
+            "html-tailwind",
+            "react-native",
+            "flutter"
+          ]
+        },
+        "validation": {
+          "template": "py -3 \"{skill_scripts}/search.py\" \"animation accessibility z-index loading\" --domain ux"
+        }
+      },
+      "maestro_integration": {
+        "search_domain": "design",
+        "nodes": [
+          "2a Preflight design-system [ui-ux-pro-max]",
+          "2b Implement UI [ui-ux-pro-max]"
+        ],
+        "subagent_must_read": [
+          "{skill_root}/SKILL.md",
+          "Preflight stdout (design tokens)",
+          "design-system/MASTER.md if --persist was used"
+        ]
+      }
     },
     "grilling": {
       "summary": "Structured interview — one question at a time with recommendations.",

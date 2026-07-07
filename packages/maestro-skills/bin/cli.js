@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name("maestro-skills")
   .description("Install and configure the Maestro skill orchestrator for multiple AI agents")
-  .version("0.1.4");
+  .version("0.1.5");
 
 program
   .command("setup")
