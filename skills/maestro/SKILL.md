@@ -156,6 +156,53 @@ Users add custom runbooks:
 npx maestro-skills runbook add my-skill --summary "..." --notes "..."
 ```
 
+Full guide: `skill-runbooks.md` (bundled with this skill).
+
+### ui-ux-pro-max (design / UI tasks)
+
+When `search` matches `ui-ux-pro-max`, read `runbook` in JSON and `skill-runbooks.md`.
+
+**Grafo minimo:**
+
+| # | No | Acao |
+|---|-----|------|
+| 2a | Preflight design-system | Parent roda CLI abaixo; anexa stdout |
+| 2b | Implement UI | Subagente segue `SKILL.md` + tokens do 2a |
+
+**Preflight obrigatorio (Windows):**
+
+```powershell
+py -3 "{skill_scripts}/search.py" "{query}" --design-system -p "{project_name}"
+```
+
+`{skill_scripts}` = pasta `scripts` ao lado do `SKILL.md` da skill (ex.: `~/.agents/skills/ui-ux-pro-max/scripts`).
+
+**Antes de implementar dashboard denso:**
+
+```powershell
+py -3 "{skill_scripts}/search.py" "{query}" --design-system --variance 8 --motion 7 --density 8 -p "{project_name}"
+```
+
+**Persistir tokens no repo (opcional):**
+
+```powershell
+py -3 "{skill_scripts}/search.py" "{query}" --design-system --persist -p "{project_name}" --page "dashboard"
+```
+
+**Complementar por dominio/stack** (subagente ou no pre-implementacao):
+
+```powershell
+py -3 "{skill_scripts}/search.py" "accessibility forms" --domain ux
+py -3 "{skill_scripts}/search.py" "kpi trends" --domain chart
+py -3 "{skill_scripts}/search.py" "suspense lists" --stack nextjs
+```
+
+Use `--project-name` no Maestro search para preencher `{project_name}`:
+
+```bash
+npx maestro-skills search "dashboard indicadores UI" --domain design --project-name "MeuProjeto" --json
+```
+
 Para tarefas com codigo versionado, inclua no grafo nos de implementacao, git e sintese:
 
 ```bash
