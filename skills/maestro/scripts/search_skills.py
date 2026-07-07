@@ -23,6 +23,7 @@ from routing import (  # noqa: E402
     select_mode,
 )
 from maestro_paths import LEGACY_MANIFEST_PATH, MANIFEST_PATH  # noqa: E402
+from runbooks import attach_runbooks, load_discover_allowlist, load_runbooks  # noqa: E402
 from synonyms import expand_query  # noqa: E402
 
 
@@ -125,6 +126,8 @@ def search_skills(
     domain: str | None = None,
     max_results: int = DEFAULT_MAX_RESULTS,
     include_hubs: bool = True,
+    project_root: Path | None = None,
+    project_name: str | None = None,
 ) -> dict:
     skills = manifest.get("skills", [])
     if not skills:
@@ -208,6 +211,35 @@ def search_skills(
         domain=active_domain,
     )
 
+    allowlist = load_discover_allowlist()
+    discover["security"] = {
+        "install_policy": "manual_by_default",
+        "auto_install_allowed": False,
+        "allowlist_path": str(Path.home() / ".maestro" / "discover-allowlist.txt"),
+        "allowlist_entries": len(allowlist),
+        "user_must_run_install": True,
+        "warning": (
+            "Never run npx skills add automatically. Present the command for the user "
+            "to review and execute. Remote skill content controls agent instructions."
+        ),
+    }
+    if discover.get("triggered"):
+        discover["install_command_template"] = (
+            "npx skills add <owner/repo@skill> -g -a <agent>"
+        )
+        discover["install_notes"] = [
+            "Review the skill source on GitHub before installing.",
+            "Add owner/repo to ~/.maestro/discover-allowlist.txt only if you trust it.",
+            "Maestro must not pass -y or run install without explicit human action.",
+        ]
+
+    resolved_project = project_root.resolve() if project_root else None
+    pname = project_name or (
+        resolved_project.name if resolved_project else "Project"
+    )
+    runbooks = load_runbooks(resolved_project)
+    attach_runbooks(results, runbooks, query=query, project_name=pname)
+
     return {
         "query": query,
         "expanded_query": expanded_query,
@@ -223,6 +255,10 @@ def search_skills(
         "count": len(results),
         "results": results,
         "discover": discover,
+        "runbooks": {
+            "sources": runbooks.get("sources", {}),
+            "skill_count": len(runbooks.get("skills", {})),
+        },
     }
 
 
@@ -265,15 +301,20 @@ def main() -> int:
     parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS)
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--project-root", default=None, help="Project root for runbook merge")
+    parser.add_argument("--project-name", default=None, help="Display name for design-system -p")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     manifest = load_manifest(Path(args.manifest))
+    project_root = Path(args.project_root).resolve() if args.project_root else None
     payload = search_skills(
         args.query,
         manifest,
         domain=args.domain,
         max_results=args.max_results,
+        project_root=project_root,
+        project_name=args.project_name,
     )
 
     if args.json:
