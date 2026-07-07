@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name("maestro-skills")
   .description("Install and configure the Maestro skill orchestrator for multiple AI agents")
-  .version("0.1.3");
+  .version("0.1.4");
 
 program
   .command("setup")
@@ -54,6 +54,7 @@ program
   .option("--project-root <path>", "Project root for runbook merge")
   .option("--project-name <name>", "Project display name for design-system -p")
   .option("--max-results <n>", "Max results", "5")
+  .option("--json", "Emit JSON (default; accepted for CLI/docs compatibility)")
   .action((query, opts) => {
     const result = runSearch(query, {
       domain: opts.domain,
@@ -73,6 +74,7 @@ program
   .description("Route multiple sub-tasks to skills (stdin or --task)")
   .option("--task <task>", "Single task (repeatable)", (v, acc = []) => acc.concat(v), [])
   .option("--domain <domain>", "Domain bucket filter")
+  .option("--json", "Emit JSON (default; accepted for CLI/docs compatibility)")
   .action((opts) => {
     const tasks = opts.task?.length ? opts.task : null;
     if (!tasks) {
@@ -126,7 +128,7 @@ runbook
         summary: opts.summary,
         notes: opts.notes,
       });
-      console.log(`Created ${path} → skills.${skill}`);
+      console.log(`Created ${path} -> skills.${skill}`);
       console.log(JSON.stringify(entry, null, 2));
     } catch (err) {
       console.error(String(err.message || err));

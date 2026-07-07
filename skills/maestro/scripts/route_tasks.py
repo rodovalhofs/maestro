@@ -11,7 +11,12 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from search_skills import DEFAULT_MANIFEST, load_manifest, search_skills  # noqa: E402
+from search_skills import (  # noqa: E402
+    DEFAULT_MANIFEST,
+    configure_stdout_utf8,
+    load_manifest,
+    search_skills,
+)
 
 
 def route_batch(
@@ -67,6 +72,7 @@ def route_batch(
 
 
 def main() -> int:
+    configure_stdout_utf8()
     parser = argparse.ArgumentParser(description="Route decomposed tasks to skills")
     parser.add_argument(
         "tasks",

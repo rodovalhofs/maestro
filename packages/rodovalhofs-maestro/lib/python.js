@@ -20,6 +20,15 @@ export function pythonCommand() {
   return null;
 }
 
+/** Stable UTF-8 for Python child stdout/stderr on Windows (cp1252/cp850 consoles). */
+export function pythonSpawnEnv() {
+  return {
+    ...process.env,
+    PYTHONIOENCODING: "utf-8",
+    PYTHONUTF8: "1",
+  };
+}
+
 export function resolveScript(name, installedSkillPath = null) {
   const fromBundle = bundledScript(name);
   if (existsSync(fromBundle)) return fromBundle;
@@ -47,6 +56,7 @@ export function runPythonScript(scriptName, args = [], { quiet = false } = {}) {
 
   const result = spawnSync(py[0], [...py.slice(1), script, ...args], {
     encoding: "utf8",
+    env: pythonSpawnEnv(),
     stdio: quiet ? "pipe" : "inherit",
     shell: false,
   });

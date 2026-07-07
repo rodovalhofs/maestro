@@ -3,7 +3,7 @@
   "skills": {
     "ui-ux-pro-max": {
       "summary": "Design intelligence — run design-system search before implementing UI.",
-      "graph_hint": "Split into Preflight design-system → Implement UI nodes.",
+      "graph_hint": "Split into Preflight design-system -> Implement UI nodes.",
       "preflight": [
         {
           "id": "design-system",

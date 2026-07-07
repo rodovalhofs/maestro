@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { pythonCommand, resolveScript, runPythonScript } from "./python.js";
+import { pythonCommand, pythonSpawnEnv, resolveScript, runPythonScript } from "./python.js";
 import { getMaestroPaths } from "./paths.js";
 
 export function runSearch(query, options = {}) {
@@ -32,6 +32,7 @@ export function runRoute(tasks, options = {}) {
   const script = resolveScript("route_tasks.py");
   const result = spawnSync(py[0], [...py.slice(1), script, ...args], {
     encoding: "utf8",
+    env: pythonSpawnEnv(),
     input,
     stdio: ["pipe", "pipe", "pipe"],
   });
