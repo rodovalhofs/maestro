@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "skills": {
+    "ui-ux-pro-max": {
+      "summary": "Design intelligence — run design-system search before implementing UI.",
+      "graph_hint": "Split into Preflight design-system → Implement UI nodes.",
+      "preflight": [
+        {
+          "id": "design-system",
+          "label": "Generate design system",
+          "when": "New page, dashboard, or visual refactor",
+          "command": "python",
+          "args": [
+            "{skill_scripts}/search.py",
+            "{query}",
+            "--design-system",
+            "-p",
+            "{project_name}"
+          ],
+          "notes": "Use output tokens in the implementation subagent prompt."
+        }
+      ]
+    },
+    "grilling": {
+      "summary": "Structured interview — one question at a time with recommendations.",
+      "graph_hint": "Add an Interview node before implementation; wait for user answer each turn.",
+      "preflight": []
+    },
+    "canvas": {
+      "summary": "Rich visual artifact for data-heavy or analytical deliverables.",
+      "graph_hint": "Prefer canvas over markdown tables when the deliverable is exploratory.",
+      "preflight": []
+    },
+    "_example": {
+      "summary": "Template entry — copy to skill-runbooks.user.json or use `npx maestro-skills runbook add`.",
+      "graph_hint": "Optional node title for the dependency graph.",
+      "preflight": [
+        {
+          "id": "example-cli",
+          "label": "Example preflight",
+          "when": "Describe when to run",
+          "command": "python",
+          "args": ["{skill_scripts}/your_script.py", "{query}"],
+          "notes": "Placeholders: {skill_root}, {skill_scripts}, {query}, {project_name}"
+        }
+      ]
+    }
+  }
+}

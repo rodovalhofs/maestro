@@ -61,3 +61,11 @@ export function skillSourceDir() {
 export function bundledBuildManifest() {
   return join(skillSourceDir(), "scripts", "build_manifest.py");
 }
+
+export function bundledScript(filename) {
+  return join(skillSourceDir(), "scripts", filename);
+}
+
+export function bundledRunbooksJson() {
+  return join(skillSourceDir(), "skill-runbooks.json");
+}

@@ -8,7 +8,7 @@ Instalação interativa do Maestro para vários agentes de IA.
 npx maestro-skills setup
 ```
 
-Pacote npm: [maestro-skills@0.1.2](https://www.npmjs.com/package/maestro-skills)
+Pacote npm: [maestro-skills](https://www.npmjs.com/package/maestro-skills)
 
 Alternativa scoped (bin `maestro`):
 
@@ -22,9 +22,42 @@ npx @rodovalhofs/maestro setup
 2. Você escolhe destinos (multi-select)
 3. Escolhe escopo: **global** (padrão) ou **este projeto** (`--project`)
 4. Copia a skill `maestro/` para cada pasta de skills
-5. Opcional: registra no [skills.sh](https://skills.sh/) via `npx skills add`
+5. Opcional: registra no [skills.sh](https://skills.sh/) — **sem `-y` automático**; revisão manual
 6. Migra manifest legado `~/.cursor/skills-manifest.json` → `~/.maestro/`
 7. Executa `build_manifest.py` (Python 3.12+)
+
+## Busca e roteamento (PowerShell-safe)
+
+Use o CLI npm em vez de `%USERPROFILE%` (não expande no PowerShell):
+
+```bash
+npx maestro-skills search "dashboard react" --json
+npx maestro-skills route --task "design UI" --task "fix CI" --json
+npx maestro-skills manifest --project-root .
+```
+
+PowerShell fallback:
+
+```powershell
+& "$env:USERPROFILE\.cursor\skills\maestro\scripts\invoke.ps1" search "..." --json
+```
+
+## Runbooks do usuário
+
+```bash
+npx maestro-skills runbook list
+npx maestro-skills runbook add my-skill --summary "..." --notes "..."
+npx maestro-skills runbook edit my-skill
+npx maestro-skills runbook init-allowlist
+```
+
+Arquivos:
+
+| Arquivo | Escopo |
+|---------|--------|
+| `skill-runbooks.json` (bundled) | Shipped com Maestro |
+| `~/.maestro/skill-runbooks.user.json` | Global do usuário |
+| `.maestro/skill-runbooks.json` | Por projeto (opcional) |
 
 ## Agentes suportados
 
@@ -37,7 +70,7 @@ npx @rodovalhofs/maestro setup
 
 Novos agentes: edite `packages/maestro-skills/agents.json`.
 
-## Comandos
+## Comandos setup/remove
 
 ```bash
 npx maestro-skills setup
@@ -53,10 +86,12 @@ npx maestro-skills remove -y --clean-home
 ~/.maestro/
 ├── skills-manifest.json
 ├── maestro-exclude.txt
+├── skill-runbooks.user.json
+├── discover-allowlist.txt
 └── config.json
 ```
 
-O `build_manifest.py` indexa skills de `~/.cursor`, `~/.claude`, `~/.codex`, `~/.agents` e pastas de projeto.
+O `build_manifest.py` indexa skills de `~/.cursor`, `~/.claude`, `~/.codex`, `~/.agents` e pastas de projeto. Veja [SECURITY.md](../SECURITY.md) para escopo de leitura local.
 
 ## Pré-requisitos
 
@@ -72,6 +107,8 @@ cd packages/maestro-skills && npm test
 ```
 
 ## Publicação npm (mantenedores)
+
+Somente o mantenedor executa publish localmente:
 
 ```bash
 npm login

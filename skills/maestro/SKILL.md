@@ -22,39 +22,65 @@ Orchestrate local Cursor skills. Maestro does **not** implement work itself — 
 4. **Do not invoke `$maestro` recursively** from subagents.
 5. Routers like `index`, `data-visualization`, `grill-me`, `conselho` stay directly invocable — maestro may include them as hub nodes.
 6. **Repos versionados:** aplicar o fluxo GitHub generico (Issues + PR + CI). Ver secao [GitHub workflow](#github-workflow) e `docs/github-workflow.md` neste repositorio.
+7. **Discover seguro:** nunca executar `npx skills add` automaticamente; sem flag `-y`; install somente por acao humana apos revisar o repo.
 
 ## Artifacts
 
 | File | Purpose |
 |------|---------|
-| `~/.cursor/skills-manifest.json` | Searchable catalog (regenerate with build_manifest) |
-| `~/.cursor/maestro-exclude.txt` | Skills banned from search |
-| `scripts/build_manifest.py` | Regenerate manifest (tags + `~/.agents/skills`) |
-| `scripts/search_skills.py` | Hybrid BM25 search + routing P0-P3 + `discover` |
+| `~/.maestro/skills-manifest.json` | Searchable catalog (regenerate with `manifest`) |
+| `~/.maestro/maestro-exclude.txt` | Skills banned from search |
+| `~/.maestro/skill-runbooks.user.json` | User runbook overrides |
+| `~/.maestro/discover-allowlist.txt` | Optional trusted repos for Discover (install still manual) |
+| `skill-runbooks.json` | Bundled runbooks (preflight CLI hints) |
+| `scripts/build_manifest.py` | Regenerate manifest |
+| `scripts/search_skills.py` | Hybrid BM25 search + routing + runbooks |
 | `scripts/route_tasks.py` | Batch route decomposed sub-tasks |
-| `scripts/concept_gaps.py` | Detect concepts in prompt without local skill coverage |
+| `scripts/invoke.ps1` / `invoke.sh` | Shell wrappers (PowerShell-safe) |
+
+## Shell commands (read this first)
+
+**Primary interface (all shells, including PowerShell):**
+
+```bash
+npx maestro-skills search "<user prompt>" --json
+npx maestro-skills route --task "<task 1>" --task "<task 2>" --json
+npx maestro-skills manifest --project-root "<workspace-root>"
+npx maestro-skills runbook list
+npx maestro-skills runbook add <skill> --summary "..." --notes "..."
+```
+
+**PowerShell fallback** (never use `%USERPROFILE%` — it does not expand in PowerShell):
+
+```powershell
+& "$env:USERPROFILE\.cursor\skills\maestro\scripts\invoke.ps1" search "<user prompt>" --json
+```
+
+**Unix:**
+
+```bash
+~/.cursor/skills/maestro/scripts/invoke.sh search "<user prompt>" --json
+```
 
 ## Workflow
 
 ### 1. Refresh manifest (if stale or missing)
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\build_manifest.py" --project-root "<workspace-root>"
+npx maestro-skills manifest --project-root "<workspace-root>"
 ```
 
-Fallback: `python` instead of `py -3` if needed.
-
-On Unix: `python3 ~/.cursor/skills/maestro/scripts/build_manifest.py --project-root "<workspace-root>"`
+Legacy: `invoke.ps1 manifest` or `python3 .../build_manifest.py --project-root "<workspace-root>"`
 
 ### 2. Search skills
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search_skills.py" "<user prompt>" --json
+npx maestro-skills search "<user prompt>" --json
 ```
 
 Optional: `--domain web|data-viz|analytics|design|creative|devops-git|video-media|integrations|security|meta|general`
 
-JSON includes `routing` (P0-P3), `confidence`, `mode`, `discover`, `intent_boosts`.
+JSON includes `routing`, `confidence`, `mode`, `discover`, `runbooks`, and per-result `runbook` when defined.
 
 Read `discover` before building the graph:
 
@@ -86,12 +112,19 @@ Repeat for each entry in `discover.queries` (max 2 concept gaps; extra gaps appe
 | 2 | Fallback local | `<discover.local_fallback>` | 1 (se discover falhar) | generalPurpose |
 | 3 | Executar tarefa | `<instalada ou #2>` | 1 ou 2 | generalPurpose |
 
-After user confirms Graph 1, spawn `find-skills` subagent to install:
+After user confirms Graph 1, **do not auto-install**. Present the install command for human review:
 
 ```bash
-npx skills add <owner/repo@skill> -g -a cursor -y
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\build_manifest.py" --project-root "<workspace-root>"
+npx skills add <owner/repo@skill> -g -a cursor
 ```
+
+Only if the user explicitly runs that command (or allowlists the repo in `~/.maestro/discover-allowlist.txt` and confirms), rebuild manifest:
+
+```bash
+npx maestro-skills manifest --project-root "<workspace-root>"
+```
+
+**Security:** Never pass `-y`. Never run `npx skills add` without explicit human action. See `SECURITY.md` and [skills.sh audits](https://www.skills.sh/rodovalhofs/maestro/maestro/security/agent-trust-hub).
 
 Re-run search with the original prompt. Present **Graph 2 — pós-discover** and wait for a **second ok** before execution subagents.
 
@@ -102,15 +135,31 @@ Re-run search with the original prompt. Present **Graph 2 — pós-discover** an
 ### 2b. Refine graph nodes (after draft decomposition)
 
 ```bash
-printf '%s\n' "<task 1>" "<task 2>" | py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\route_tasks.py" --json
+npx maestro-skills route --task "<task 1>" --task "<task 2>" --json
 ```
 
 Merge router output into the graph: prefer installed `path` when `mode` is `auto-load`; honor `discover` flags from each task.
 
+### 2c. Skill runbooks and preflight
+
+Read `skill-runbooks.md`. When a search result includes `runbook.preflight`:
+
+1. Add a **Preflight** node before the implementation node.
+2. **Parent (Maestro) runs** the preflight CLI and attaches stdout to the subagent prompt.
+3. If preflight fails, stop — do not spawn the implementation subagent.
+
+Merge order: bundled `skill-runbooks.json` → `~/.maestro/skill-runbooks.user.json` → `<project>/.maestro/skill-runbooks.json`.
+
+Users add custom runbooks:
+
+```bash
+npx maestro-skills runbook add my-skill --summary "..." --notes "..."
+```
+
 Para tarefas com codigo versionado, inclua no grafo nos de implementacao, git e sintese:
 
 ```bash
-py -3 "%USERPROFILE%\.cursor\skills\maestro\scripts\search_skills.py" "github issues PR yeet branch feat CI" --domain devops-git --json
+npx maestro-skills search "github issues PR yeet branch feat CI" --domain devops-git --json
 ```
 
 Leia `docs/github-workflow.md` (neste repo ou copiado para o projeto) quando a tarefa tocar codigo versionado.
@@ -139,12 +188,14 @@ From top search results (3–5 skills), design a **DAG**:
 - **Parallel** → only independent branches (e.g. `research` + `audit`), then merge.
 - **Hub routers** → use `index` or `data-visualization` as one node instead of many leaf skills when the task is broad within that plugin.
 
-**Fusion:** combine skills with the same role into one node:
+**Fusion:** combine skills with the same role into one node. When `runbook.preflight` exists, split into `Preflight <id>` → `Implement` nodes:
 
 ```text
-Node 2 — Implement UI [react-best-practices + shadcn-best-practices]
-  skills: react-best-practices, shadcn-best-practices
-  path: .../react-best-practices/SKILL.md (read all listed skills)
+Node 2a — Preflight design-system [ui-ux-pro-max]
+  run preflight CLI; attach output to Node 2b prompt
+Node 2b — Implement UI [ui-ux-pro-max]
+  skills: ui-ux-pro-max
+  path: .../ui-ux-pro-max/SKILL.md
 ```
 
 ### 5. Present editable graph (mandatory)
@@ -263,10 +314,10 @@ cp templates/CONTRIBUTING.md <seu-projeto>/
 
 ## Maintenance
 
-After syncing Codex skills, regenerate manifest:
+After syncing skills or editing runbooks:
 
 ```bash
-py -3 ~/.cursor/skills/maestro/scripts/build_manifest.py
+npx maestro-skills manifest
 ```
 
-Or run the full sync script which rebuilds manifest automatically.
+After changing this repo, run `node scripts/sync-skill-to-cli.mjs` before npm publish (maintainer only).

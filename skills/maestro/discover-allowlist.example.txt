@@ -1,0 +1,5 @@
+# Trusted GitHub repos for optional Discover install (one per line)
+# Format: owner/repo  or  owner/repo@skill
+# Maestro never auto-installs — this list only documents repos you reviewed.
+#
+# rodovalhofs/maestro

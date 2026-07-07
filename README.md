@@ -161,14 +161,23 @@ Depois rode `build_manifest.py` (ver acima).
 ## CLI de debug
 
 ```bash
-# Buscar skills para um prompt
-py -3 ~/.cursor/skills/maestro/scripts/search_skills.py "dashboard react" --json
+# Buscar skills (recomendado — funciona no PowerShell)
+npx maestro-skills search "dashboard react" --json
 
 # Rotear sub-tarefas
-printf '%s\n' "design UI" "fix CI" | py -3 ~/.cursor/skills/maestro/scripts/route_tasks.py --json
+npx maestro-skills route --task "design UI" --task "fix CI" --json
+
+# Regenerar manifest
+npx maestro-skills manifest --project-root .
+
+# Runbooks do usuário
+npx maestro-skills runbook list
+npx maestro-skills runbook init-allowlist
 ```
 
-Campos úteis no JSON: `results`, `routing`, `discover`, `weak_match`.
+PowerShell fallback: `& "$env:USERPROFILE\.cursor\skills\maestro\scripts\invoke.ps1" search "..." --json`
+
+Campos úteis no JSON: `results`, `routing`, `discover`, `runbook` (por skill), `weak_match`.
 
 Domínios (`--domain`): `web` · `data-viz` · `analytics` · `design` · `creative` · `devops-git` · `video-media` · `integrations` · `security` · `meta` · `general`
 
