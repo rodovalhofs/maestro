@@ -1,6 +1,6 @@
 {
   "name": "maestro-skills",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
   "author": "Yuri Rodovalho",
@@ -37,9 +37,9 @@
     "README.md"
   ],
   "scripts": {
-    "prepack": "node ../../scripts/sync-skill-to-cli.mjs",
+    "prepack": "node ../../scripts/sync-skill-to-cli.mjs --target maestro-skills",
     "prepublishOnly": "node -e \"const fs=require('fs'); if(!fs.existsSync('skill/SKILL.md')){console.error('Missing skill/ — run sync-skill-to-cli'); process.exit(1)}\"",
-    "test": "node --test test/"
+    "test": "node --test"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.1",

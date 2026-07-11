@@ -3,15 +3,15 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadAgents } from "./paths.js";
 
-export function detectAgents({ project = false, cwd = process.cwd() } = {}) {
+export function detectAgents({ project = false, cwd = process.cwd(), home = homedir() } = {}) {
   const agents = loadAgents();
-  const base = project ? cwd : homedir();
+  const base = project ? cwd : home;
 
   return agents.map((agent) => {
     const detected = agent.detectDirs.some((dir) => existsSync(join(base, dir)));
     return {
       ...agent,
-      detected: detected || !project,
+      detected,
       skillsPath: join(base, project ? agent.projectSkillsDir : agent.globalSkillsDir),
     };
   });

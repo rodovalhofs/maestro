@@ -53,6 +53,22 @@ CAMEL_CASE_PATTERN = re.compile(r"\b([a-z]+(?:[A-Z][a-z0-9]+)+)\b")
 
 CONCEPT_GAP_SCORE_THRESHOLD = 1.5
 
+NATURAL_HYPHENATED_PHRASES: frozenset[str] = frozenset(
+    {
+        "day-to-day",
+        "end-to-end",
+        "open-source",
+        "real-time",
+        "cross-platform",
+        "test-first",
+        "read-only",
+        "high-risk",
+        "low-risk",
+        "multi-agent",
+        "long-term",
+        "short-term",
+    }
+)
 
 def _normalize_term(term: str) -> str:
     return term.strip().lower().replace("_", "-")
@@ -87,9 +103,11 @@ def extract_concept_candidates(query: str) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
 
-    def add(raw: str) -> None:
+    def add(raw: str, *, explicit: bool = False) -> None:
         term = _normalize_term(raw)
         if not term or is_stopword(term):
+            return
+        if term in NATURAL_HYPHENATED_PHRASES:
             return
         if term in seen:
             return
@@ -97,7 +115,7 @@ def extract_concept_candidates(query: str) -> list[str]:
         ordered.append(term)
 
     for match in IMPLEMENTATION_VERB_PATTERN.finditer(query):
-        add(match.group(1))
+        add(match.group(1), explicit=True)
 
     for pattern in (HYPHENATED_PATTERN, CAMEL_CASE_PATTERN):
         for match in pattern.finditer(query):
@@ -194,3 +212,27 @@ def build_discover_queries(
         query = f"{gap} {context}".strip()
         queries.append(query)
     return queries
+
+
+def sanitize_external_query(query: str, max_length: int = 160) -> str:
+    """Redact common sensitive values before a proposed network search."""
+    text = str(query)
+    patterns = [
+        (r"https?://\S+", "[url]"),
+        (r"\b[A-Za-z]:\\[^\s]+", "[path]"),
+        (r"(?<!\w)/(?:[^\s/]+/)+[^\s]+", "[path]"),
+        (r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b", "[email]"),
+        (
+            r"(?i)\b(?:token|password|passwd|secret|api[_-]?key|credential)\s*[:=]\s*\S+",
+            "[secret]",
+        ),
+        (r"\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}\b", "[secret]"),
+    ]
+    for pattern, replacement in patterns:
+        text = re.sub(pattern, replacement, text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        text = "agent skill"
+    if len(text) > max_length:
+        text = text[: max_length - 1].rstrip() + "…"
+    return text

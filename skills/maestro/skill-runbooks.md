@@ -1,36 +1,49 @@
 # Skill runbooks
 
-Maestro attaches **runbooks** to search results when a matched skill needs extra CLI steps before subagents run.
+Runbooks attach validated preflight metadata to a search result. Maestro resolves
+placeholders but does not execute the command itself.
 
-## Merge order
+## Merge and trust
 
-1. Bundled `skill-runbooks.json` (shipped with Maestro)
-2. `~/.maestro/skill-runbooks.user.json` (per user, all projects)
-3. `<project>/.maestro/skill-runbooks.json` (optional, version in your repo)
+Sources merge in this order:
 
-Later sources override fields on the same skill name.
+1. bundled `skill-runbooks.json`;
+2. `~/.maestro/skill-runbooks.user.json`;
+3. `<project>/.maestro/skill-runbooks.json`.
 
-## User overrides
+Later entries override earlier fields. Every attached entry includes `provenance`.
+Invalid JSON, oversized files, invalid effects, and malformed preflights are reported
+in `runbooks.errors` and skipped.
 
-```bash
-npx maestro-skills runbook list
-npx maestro-skills runbook add my-skill --notes "Run lint before deploy"
-npx maestro-skills runbook edit my-skill
-```
+Trust policy:
 
-Or create `~/.maestro/skill-runbooks.user.json`:
+| Source/effect | Default |
+|---------------|---------|
+| bundled + required + `read_local` | may run after graph approval |
+| user or project source | explicit preflight approval |
+| `write_workspace` | explicit write approval |
+| `network`, `install_remote` | explicit network/install approval |
+| `git_commit`, `publish_external`, `unknown` | explicit effect approval |
+
+Project runbooks are repository-controlled input. Review them like build scripts.
+
+## Schema
 
 ```json
 {
+  "version": 1,
   "skills": {
-    "my-custom-skill": {
-      "summary": "What this skill needs",
+    "my-skill": {
+      "summary": "Run local lint before implementation",
+      "graph_hint": "Preflight lint -> implement",
       "preflight": [
         {
           "id": "lint",
           "label": "Lint package",
           "command": "npm",
           "args": ["run", "lint"],
+          "effect": "read_local",
+          "required": false,
           "notes": "Run from project root"
         }
       ]
@@ -39,186 +52,54 @@ Or create `~/.maestro/skill-runbooks.user.json`:
 }
 ```
 
-## Preflight placeholders
+Allowed effects: `read_local`, `write_workspace`, `network`, `install_remote`,
+`git_commit`, `publish_external`, and `unknown`.
+
+Use the structured `resolved_command` and `resolved_args` returned by search. Pass
+them directly to a process API with shell execution disabled. Do not interpolate a
+shell command string.
+
+## Placeholders
 
 | Placeholder | Value |
-|-------------|--------|
-| `{skill_root}` | Directory containing the skill's `SKILL.md` |
-| `{skill_scripts}` | `{skill_root}/scripts` |
-| `{query}` | Original Maestro user prompt |
-| `{project_name}` | Project folder name or `-p` value |
+|-------------|-------|
+| `{skill_root}` | directory containing the selected `SKILL.md` |
+| `{skill_scripts}` | `<skill_root>/scripts` |
+| `{query}` | original local query |
+| `{project_name}` | explicit project name or project folder name |
 
----
+Platform overrides may replace the executable and add an argument prefix:
 
-## ui-ux-pro-max
-
-Skill path (typical): `~/.agents/skills/ui-ux-pro-max/` or `~/.cursor/skills/ui-ux-pro-max/`
-
-Scripts live in `{skill_root}/scripts/search.py`. **Requires Python 3.**
-
-### When Maestro should route here
-
-Use when the task changes how something **looks, feels, moves, or is interacted with**:
-
-- Dashboard, landing page, admin panel, e-commerce, SaaS UI
-- Components: buttons, modals, forms, tables, charts, navigation
-- Design review, accessibility, dark mode, responsive layout
-
-**Skip** for pure backend/API/DB/DevOps.
-
-### Grafo Maestro (obrigatorio)
-
-```text
-1. Explore / context (se repo novo)
-2a. Preflight design-system [ui-ux-pro-max]  <- parent executa CLI abaixo
-2b. Implement UI [ui-ux-pro-max]             <- subagente le SKILL.md + stdout do 2a
-3. GitHub (se repo versionado)
+```json
+{
+  "command": "python3",
+  "args": ["{skill_scripts}/search.py", "{query}"],
+  "platforms": {
+    "win32": { "command": "py", "args_prefix": ["-3"] },
+    "default": { "command": "python3", "args_prefix": [] }
+  }
+}
 ```
 
-Parent **executa** o preflight e cola a saida no prompt do subagente. Se falhar, nao spawnar 2b.
-
-### Step 1 — Analisar o prompt
-
-Extrair do pedido do usuario:
-
-| Campo | Exemplos |
-|-------|----------|
-| Product type | SaaS, dashboard, landing, e-commerce, mobile app |
-| Audience | internal ops, end consumer, B2B |
-| Style | minimal, dark mode, dense dashboard, glassmorphism |
-| Stack | react, nextjs, shadcn, vue, tailwind |
-
-### Step 2 — Design system (OBRIGATORIO)
-
-Sempre comecar com `--design-system`:
-
-**Windows (PowerShell):**
-
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "<produto> <industria> <keywords>" --design-system -p "<ProjectName>"
-```
-
-**Com placeholders do runbook (apos `npx maestro-skills search`):**
-
-```powershell
-py -3 "{skill_scripts}/search.py" "{query}" --design-system -p "{project_name}"
-```
-
-**Unix:**
+## User commands
 
 ```bash
-python3 ~/.agents/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system -p "<ProjectName>"
+npx maestro-skills runbook list
+npx maestro-skills runbook add my-skill --summary "Local lint" --notes "Run before implementation"
+npx maestro-skills runbook edit my-skill
 ```
 
-**Exemplo (dashboard interno):**
+`runbook add` creates an inert entry with no preflight commands. Edit the JSON to add
+commands and effects.
 
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "internal analytics dashboard saas minimal" --design-system -p "ComprasPJ"
-```
+## Bundled UI preflight
 
-**Dashboard denso (dials opcionais 1-10):**
+The bundled `ui-ux-pro-max` entry contains:
 
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "internal analytics dashboard" --design-system --variance 8 --motion 7 --density 8 -p "ComprasPJ"
-```
+- required `design-system`: read-only, with `py -3` on Windows and `python3` elsewhere;
+- optional `design-system-persist`: writes into the project and requires approval.
 
-| Dial | Baixo (1-3) | Alto (8-10) |
-|------|-------------|-------------|
-| `--variance` | Minimal, centrado | Bold, bento/asimetrico |
-| `--motion` | Micro-interacoes | Coreografia complexa + snippet GSAP |
-| `--density` | Espacoso (marketing) | Denso (dashboard) |
-
-### Step 2b — Persistir no projeto (opcional)
-
-Para tokens reutilizaveis entre sessoes (commitar `design-system/` no git):
-
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "<query>" --design-system --persist -p "ComprasPJ"
-```
-
-Pagina especifica:
-
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "<query>" --design-system --persist -p "ComprasPJ" --page "dashboard"
-```
-
-Hierarquia:
-
-1. `design-system/pages/<page>.md` (se existir) **sobrescreve**
-2. Senao `design-system/MASTER.md`
-
-Prompt para o subagente apos persist:
-
-```text
-Read design-system/MASTER.md and design-system/pages/<page>.md if it exists.
-Prioritize the page file over Master. Then implement...
-```
-
-### Step 3 — Buscas complementares (antes de codar)
-
-Depois do design system, se precisar de detalhe:
-
-```powershell
-# UX / acessibilidade
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "forms accessibility animation" --domain ux
-
-# Graficos em dashboard
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "real-time dashboard kpi" --domain chart
-
-# Stack do projeto
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "list performance suspense" --stack nextjs
-
-# shadcn
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "composition primitives" --stack shadcn
-```
-
-| Dominio `--domain` | Uso |
-|--------------------|-----|
-| `ux` | A11y, animacao, forms, loading |
-| `style` | glassmorphism, minimalism, dark mode |
-| `color` | Paletas por tipo de produto |
-| `typography` | Pares de fontes |
-| `chart` | Tipo de grafico para dados |
-| `landing` | Hero, pricing, social proof |
-| `product` | Padroes por vertical |
-| `google-fonts` | Fonte especifica |
-| `prompt` | Keywords CSS |
-
-### Step 4 — Validacao pre-entrega
-
-```powershell
-py -3 "$env:USERPROFILE\.agents\skills\ui-ux-pro-max\scripts\search.py" "animation accessibility z-index loading" --domain ux
-```
-
-Checklist rapido no `SKILL.md`: contraste 4.5:1, touch 44px, focus visible, sem emoji como icone, reduced-motion.
-
-### Maestro + ui-ux-pro-max (fluxo completo)
-
-```bash
-# 1. Maestro encontra a skill e anexa runbook
-npx maestro-skills search "melhorar dashboard indicadores UI" --domain design --json
-
-# 2. No JSON, results[].runbook traz preflight com resolved_args
-# 3. Parent executa preflight (design-system)
-# 4. Subagente implementa com SKILL.md + saida do CLI
-```
-
-`--project-name` no Maestro search define o `-p` do design system:
-
-```bash
-npx maestro-skills search "dashboard indicadores" --domain design --project-name "ComprasPJ" --json
-```
-
----
-
-## grilling
-
-Interview node: one question per turn, include your recommended answer, wait for user reply.
-
-## canvas
-
-Use when the deliverable is a visual/analytical artifact (dashboard, audit, timeline) instead of plain markdown.
-
-## _example
-
-Copy this entry as a template for custom skills. Do not reference private paths or secrets in public runbooks.
+When present in a search result, use its resolved fields instead of copying a
+machine-specific path from documentation. Attach read-only stdout to the dependent
+implementation node. A required failure blocks that node; an optional failure does not
+block unrelated work.

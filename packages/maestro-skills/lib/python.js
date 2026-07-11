@@ -9,13 +9,14 @@ import {
 } from "./paths.js";
 
 export function pythonCommand() {
+  const check = ["-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"];
   if (process.platform === "win32") {
-    const py = spawnSync("py", ["-3", "--version"], { encoding: "utf8" });
+    const py = spawnSync("py", ["-3", ...check], { encoding: "utf8" });
     if (py.status === 0) return ["py", "-3"];
   }
-  const python3 = spawnSync("python3", ["--version"], { encoding: "utf8" });
+  const python3 = spawnSync("python3", check, { encoding: "utf8" });
   if (python3.status === 0) return ["python3"];
-  const python = spawnSync("python", ["--version"], { encoding: "utf8" });
+  const python = spawnSync("python", check, { encoding: "utf8" });
   if (python.status === 0) return ["python"];
   return null;
 }
@@ -39,17 +40,21 @@ export function resolveScript(name, installedSkillPath = null) {
   return fromBundle;
 }
 
-export function runPythonScript(scriptName, args = [], { quiet = false } = {}) {
+export function runPythonScript(
+  scriptName,
+  args = [],
+  { quiet = false, installedSkillPath = null } = {},
+) {
   const py = pythonCommand();
   if (!py) {
     return {
       ok: false,
-      error: "Python 3.12+ not found. Install Python or use WSL/macOS python3.",
+      error: "Python 3.10+ not found. Install Python or use WSL/macOS python3.",
       code: 127,
     };
   }
 
-  const script = resolveScript(scriptName);
+  const script = resolveScript(scriptName, installedSkillPath);
   if (!existsSync(script)) {
     return { ok: false, error: `Script not found: ${script}`, code: 1 };
   }
@@ -81,12 +86,12 @@ export function runBuildManifest({
   projectRoot = process.cwd(),
   quiet = false,
   installedSkillPath = null,
+  output = getMaestroPaths().manifest,
 } = {}) {
-  const { manifest } = getMaestroPaths();
   return runPythonScript(
     "build_manifest.py",
-    ["--project-root", projectRoot, "--output", manifest],
-    { quiet },
+    ["--project-root", projectRoot, "--output", output],
+    { quiet, installedSkillPath },
   );
 }
 

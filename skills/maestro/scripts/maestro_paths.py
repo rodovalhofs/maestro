@@ -10,6 +10,7 @@ MAESTRO_HOME = Path(os.environ.get("MAESTRO_HOME", Path.home() / ".maestro"))
 MANIFEST_PATH = MAESTRO_HOME / "skills-manifest.json"
 EXCLUDE_PATH = MAESTRO_HOME / "maestro-exclude.txt"
 CONFIG_PATH = MAESTRO_HOME / "config.json"
+CODEX_PLUGIN_CACHE = Path.home() / ".codex" / "plugins" / "cache"
 
 LEGACY_CURSOR_HOME = Path(os.environ.get("CURSOR_HOME", Path.home() / ".cursor"))
 LEGACY_MANIFEST_PATH = LEGACY_CURSOR_HOME / "skills-manifest.json"
@@ -20,6 +21,7 @@ GLOBAL_SKILL_ROOTS: list[tuple[Path, str]] = [
     (Path.home() / ".cursor" / "skills", "cursor"),
     (Path.home() / ".claude" / "skills", "claude"),
     (Path.home() / ".codex" / "skills", "codex"),
+    (Path.home() / ".codex" / "skills" / ".system", "codex-system"),
     (Path.home() / ".agents" / "skills", "agents"),
 ]
 

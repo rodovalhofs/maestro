@@ -1,20 +1,19 @@
 # maestro-skills
 
-CLI de instalação interativa do [Maestro](https://github.com/rodovalhofs/maestro).
+Local-first installer and CLI for the Maestro skill router.
 
 ```bash
 npx maestro-skills setup
+npx maestro-skills doctor
+npx maestro-skills search "fix CI"
 ```
 
-[![npm](https://img.shields.io/npm/v/maestro-skills)](https://www.npmjs.com/package/maestro-skills)
+Supported destinations: Cursor (`--cursor`), Claude Code (`--claude`), Codex
+(`--codex`), and universal agent skills (`--universal`). Use `--project` to keep an
+installation inside the current repository.
 
-## Agentes
+Search, route, manifest, doctor, setup, and remove run locally. Remote skill discovery
+is opt-in and remote installation is never automatic.
 
-| Agente | Flag |
-|--------|------|
-| Cursor | `--cursor` |
-| Claude Code | `--claude` |
-| Codex | `--codex` |
-| Universal | `--universal` |
-
-Docs: [maestro-skills-cli.md](../../docs/maestro-skills-cli.md)
+Project: https://github.com/rodovalhofs/maestro
+Security: https://github.com/rodovalhofs/maestro/blob/main/SECURITY.md

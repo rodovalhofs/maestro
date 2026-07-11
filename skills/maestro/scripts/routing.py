@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 AUTO_LOAD_CONFIDENCE = 0.22
@@ -11,10 +12,12 @@ OPTIONAL_LOAD_CONFIDENCE = 0.12
 REFERENCE_BM25_SCORE = 8.0
 
 HIGH_RISK_PATTERNS = [
-    r"config\b", r"\.env", r"auth", r"delete", r"remove", r"rm\s",
-    r"push\s+--force", r"deploy", r"secret", r"password", r"token",
-    r"excluir", r"remover", r"deletar", r"deploy", r"producao", r"produção",
-    r"\bPOST\b", r"\bPUT\b", r"\bDELETE\b",
+    r"\bconfig(?:uration|uracao)?\b", r"(?:^|[\\/])\.env(?:\b|$)",
+    r"\bauth(?:entication|orization)?\b", r"\bdelete\b", r"\bremove\b",
+    r"(?:^|\s)rm\s", r"\bpush\s+--force\b", r"\bdeploy\b",
+    r"\bsecret\b", r"\bpassword\b", r"\btoken\b", r"\bexcluir\b",
+    r"\bremover\b", r"\bdeletar\b", r"\bproducao\b",
+    r"\bpost\b", r"\bput\b",
 ]
 
 VALID_MODES = {"auto-load", "recommend", "bypass"}
@@ -28,8 +31,11 @@ def bm25_to_confidence(score: float) -> float:
 
 
 def is_high_risk(task: str) -> bool:
-    task_lower = task.lower()
-    return any(re.search(pat, task_lower, re.IGNORECASE) for pat in HIGH_RISK_PATTERNS)
+    decomposed = unicodedata.normalize("NFKD", task.casefold())
+    normalized = "".join(
+        char for char in decomposed if not unicodedata.combining(char)
+    )
+    return any(re.search(pattern, normalized) for pattern in HIGH_RISK_PATTERNS)
 
 
 def select_mode(
@@ -42,10 +48,10 @@ def select_mode(
         return "bypass"
     if high_risk:
         return "recommend"
-    if suggested_mode in VALID_MODES:
-        return suggested_mode
     if confidence >= AUTO_LOAD_CONFIDENCE:
         return "auto-load"
+    if suggested_mode == "bypass":
+        return "bypass"
     if confidence >= OPTIONAL_LOAD_CONFIDENCE:
         return "recommend"
     return "recommend"
@@ -57,7 +63,7 @@ def build_routing(
     high_risk: bool,
     bypass: bool = False,
 ) -> dict[str, Any]:
-    if bypass or not matches:
+    if bypass:
         return {
             "priority": "P3",
             "decision": "bypass",
@@ -73,6 +79,15 @@ def build_routing(
             "reason": "High-risk task; confirm before side effects.",
             "load_limit": 1,
             "report_policy": "report",
+        }
+
+    if not matches:
+        return {
+            "priority": "P3",
+            "decision": "bypass",
+            "reason": "No installed skill matched the task.",
+            "load_limit": 0,
+            "report_policy": "silent",
         }
 
     top = matches[0]

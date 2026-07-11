@@ -11,6 +11,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from catalog import CatalogError  # noqa: E402
+from domains import DOMAINS  # noqa: E402
 from search_skills import (  # noqa: E402
     DEFAULT_MANIFEST,
     configure_stdout_utf8,
@@ -18,14 +20,18 @@ from search_skills import (  # noqa: E402
     search_skills,
 )
 
+MAX_TASKS = 100
+MAX_TASK_LENGTH = 10_000
+
 
 def route_batch(
     tasks: list[str],
     manifest_path: Path,
+    domain: str | None = None,
 ) -> dict:
     manifest = load_manifest(manifest_path)
     results = [
-        search_skills(task.strip(), manifest)
+        search_skills(task.strip(), manifest, domain=domain)
         for task in tasks
         if task.strip()
     ]
@@ -80,6 +86,7 @@ def main() -> int:
         help="Task strings; omit and use stdin for batch mode",
     )
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -88,7 +95,22 @@ def main() -> int:
     else:
         tasks = [line.strip() for line in sys.stdin if line.strip()]
 
-    payload = route_batch(tasks, Path(args.manifest))
+    if len(tasks) > MAX_TASKS or any(len(task) > MAX_TASK_LENGTH for task in tasks):
+        print(
+            f"Error: route accepts at most {MAX_TASKS} tasks of {MAX_TASK_LENGTH} characters each.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        payload = route_batch(tasks, Path(args.manifest), domain=args.domain)
+    except (CatalogError, OSError) as error:
+        payload = {"error": "catalog_unavailable", "message": str(error)}
+        if args.json or not sys.stdout.isatty():
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"Error: {error}", file=sys.stderr)
+        return 2
 
     if args.json or not sys.stdout.isatty():
         print(json.dumps(payload, indent=2, ensure_ascii=False))

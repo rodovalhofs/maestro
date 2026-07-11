@@ -13,7 +13,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from bm25 import BM25  # noqa: E402
-from concept_gaps import build_discover_queries, find_concept_gaps  # noqa: E402
+from catalog import CatalogError, catalog_for_project, validate_manifest  # noqa: E402
+from concept_gaps import (  # noqa: E402
+    build_discover_queries,
+    find_concept_gaps,
+    sanitize_external_query,
+)
 from domains import DOMAINS, HUB_SKILLS, classify_query, domain_label  # noqa: E402
 from intents import apply_intent_boost, is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import (  # noqa: E402
@@ -43,18 +48,24 @@ DEFAULT_MAX_RESULTS = 5
 
 def load_manifest(path: Path) -> dict:
     if not path.is_file():
-        raise FileNotFoundError(
-            f"Manifest not found: {path}. Run: python build_manifest.py"
+        raise CatalogError(
+            f"Manifest not found: {path}. Run: maestro-skills manifest --project-root ."
         )
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise CatalogError(f"Manifest is not valid JSON: {path}: {error}") from error
+    validate_manifest(manifest)
+    return manifest
 
 
 def skill_document(skill: dict[str, Any]) -> str:
     tags = skill.get("tags") or []
     tag_text = " ".join(str(t) for t in tags) if isinstance(tags, list) else str(tags)
     return (
-        f"{skill['name']} {skill.get('folder', '')} "
-        f"{skill.get('description', '')} {tag_text} {skill.get('domain', '')}"
+        f"{skill['name']} {skill['name']} {skill['name']} {skill['name']} "
+        f"{skill.get('folder', '')} {skill.get('folder', '')} "
+        f"{tag_text} {tag_text} {tag_text} {skill.get('description', '')}"
     )
 
 
@@ -101,6 +112,7 @@ def build_discover(
         queries = build_discover_queries(gaps, query, domain)
     elif triggered:
         queries = [query]
+    queries = [sanitize_external_query(item) for item in queries]
 
     local_fallback: dict[str, str] | None = None
     if results:
@@ -129,7 +141,7 @@ def search_skills(
     project_root: Path | None = None,
     project_name: str | None = None,
 ) -> dict:
-    skills = manifest.get("skills", [])
+    skills = catalog_for_project(manifest, project_root)
     if not skills:
         return {"error": "empty_manifest", "query": query}
 
@@ -143,10 +155,6 @@ def search_skills(
     active_domain = domain or detected_domain
 
     pool = skills
-    if active_domain != "general":
-        domain_pool = [s for s in skills if s.get("domain") == active_domain]
-        if len(domain_pool) >= 3:
-            pool = domain_pool
 
     documents = [skill_document(s) for s in pool]
     bm25 = BM25()
@@ -162,8 +170,11 @@ def search_skills(
             continue
 
         skill_text = skill_document(skill)
+        domain_adjusted = score
+        if active_domain != "general" and skill.get("domain") == active_domain:
+            domain_adjusted *= 1.15
         adjusted, intent_boosts, suggested_mode = apply_intent_boost(
-            score, skill["name"], skill_text, intents
+            domain_adjusted, skill["name"], skill_text, intents
         )
         confidence = bm25_to_confidence(adjusted)
         mode = select_mode(confidence, high_risk, suggested_mode, bypass=bypass)
@@ -215,6 +226,10 @@ def search_skills(
     discover["security"] = {
         "install_policy": "manual_by_default",
         "auto_install_allowed": False,
+        "effect": "network",
+        "requires_network_consent": True,
+        "default_policy": "local_only",
+        "remote_service": "skills.sh",
         "allowlist_path": str(Path.home() / ".maestro" / "discover-allowlist.txt"),
         "allowlist_entries": len(allowlist),
         "user_must_run_install": True,
@@ -258,6 +273,14 @@ def search_skills(
         "runbooks": {
             "sources": runbooks.get("sources", {}),
             "skill_count": len(runbooks.get("skills", {})),
+            "errors": runbooks.get("errors", []),
+        },
+        "catalog": {
+            "version": manifest.get("version"),
+            "generated_at": manifest.get("generated_at"),
+            "manifest_project_root": manifest.get("project_root"),
+            "active_project_root": str(resolved_project).replace("\\", "/") if resolved_project else None,
+            "skill_count": len(skills),
         },
     }
 
@@ -317,16 +340,24 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    manifest = load_manifest(Path(args.manifest))
-    project_root = Path(args.project_root).resolve() if args.project_root else None
-    payload = search_skills(
-        args.query,
-        manifest,
-        domain=args.domain,
-        max_results=args.max_results,
-        project_root=project_root,
-        project_name=args.project_name,
-    )
+    try:
+        manifest = load_manifest(Path(args.manifest))
+        project_root = Path(args.project_root).resolve() if args.project_root else None
+        payload = search_skills(
+            args.query,
+            manifest,
+            domain=args.domain,
+            max_results=args.max_results,
+            project_root=project_root,
+            project_name=args.project_name,
+        )
+    except (CatalogError, OSError) as error:
+        payload = {"error": "catalog_unavailable", "message": str(error)}
+        if args.json:
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"Error: {error}", file=sys.stderr)
+        return 2
 
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))

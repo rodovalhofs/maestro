@@ -3,16 +3,39 @@ name: Publish npm
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/sync-skill-to-cli.mjs
+      - run: python -m unittest discover -s tests -v
+      - run: npm ci
+        working-directory: packages/maestro-skills
+      - run: npm test
+        working-directory: packages/maestro-skills
+      - run: node scripts/verify-packages.mjs
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "20"

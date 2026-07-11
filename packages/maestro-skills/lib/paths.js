@@ -27,6 +27,11 @@ export function loadAgents() {
   return JSON.parse(raw).agents;
 }
 
+export function packageVersion() {
+  const raw = readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8");
+  return JSON.parse(raw).version;
+}
+
 export function resolveSkillsDir(agent, { project = false, cwd = process.cwd() } = {}) {
   const base = project ? cwd : homedir();
   const rel = project ? agent.projectSkillsDir : agent.globalSkillsDir;

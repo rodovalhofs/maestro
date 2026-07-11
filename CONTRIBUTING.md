@@ -1,31 +1,43 @@
-# Contribuindo
+# Contributing
 
-Obrigado pelo interesse no Maestro. Este projeto é open source (MIT).
+Maestro is MIT-licensed and accepts focused bug fixes, routing improvements,
+cross-platform fixes, security hardening, tests, and documentation.
 
-## Como contribuir
+## Local workflow
 
-1. Faça fork do repositório.
-2. Crie uma branch: `feat/<slug>` ou `fix/<slug>`.
-3. Para mudanças no motor de busca, inclua ou atualize testes em `tests/`.
-4. Rode localmente:
-   ```bash
-   python -m unittest discover -s tests -v
-   ```
-5. Abra um Pull Request para `main` com descrição clara do que mudou e por quê.
+1. Create a branch such as `fix/catalog-isolation` or `feat/doctor-check`.
+2. Add a behavior test that fails for the bug or requirement.
+3. Change the canonical source:
+   - Python engine and skill: `skills/maestro/`;
+   - npm runtime: `packages/maestro-skills/`.
+4. Synchronize generated package copies.
+5. Run all validation locally.
 
-## Áreas bem-vindas
+```bash
+node scripts/sync-skill-to-cli.mjs
+python -m unittest discover -s tests -v
+npm ci --prefix packages/maestro-skills
+npm test --prefix packages/maestro-skills
+npm run verify:packages
+```
 
-- Melhorias no ranking (intents, sinônimos, domínios)
-- Novos casos de teste com fixtures
-- Documentação e exemplos no README / SKILL.md
-- Traduções ou clareza no README
+Do not edit `packages/*/skill/` directly. The scoped package runtime is generated from
+`packages/maestro-skills/lib/` by the sync script.
 
-## Estilo de código
+## Compatibility
 
-- Python 3.12+ compatível
-- Scripts em `skills/maestro/scripts/` devem permanecer sem dependências obrigatórias além da stdlib (PyYAML continua opcional)
-- Mensagens de commit em português ou inglês, descritivas
+- Node.js 18+;
+- Python 3.10+ using only the standard library in the runtime engine;
+- Windows, macOS, and Linux;
+- Cursor, Claude Code, Codex, and universal agent skill directories.
 
-## Segurança
+Keep local-only operations free of implicit network calls. New external effects must
+be represented in output, disabled by default, and covered by consent-oriented tests.
 
-Veja [SECURITY.md](SECURITY.md) para reporte responsável de vulnerabilidades.
+## Pull requests
+
+Explain the observed behavior, the intended behavior, security/privacy implications,
+and the commands used to validate the change. Keep unrelated refactors separate.
+
+For vulnerabilities, follow [SECURITY.md](SECURITY.md) and use a private advisory
+instead of a public issue containing exploit details.

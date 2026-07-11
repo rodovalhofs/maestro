@@ -1,6 +1,6 @@
 {
   "name": "maestro-monorepo",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Interactive setup for the Maestro skill orchestrator (multi-agent)",
   "license": "MIT",
   "author": "Yuri Rodovalho",
@@ -25,8 +25,9 @@
     "test:py": "python -m unittest discover -s tests -v",
     "test:js": "npm test --prefix packages/maestro-skills",
     "test": "npm run test:py && npm run test:js",
-    "publish:cli": "node scripts/publish-cli.mjs",
-    "publish:scoped": "node scripts/sync-skill-to-cli.mjs && npm publish -C packages/rodovalhofs-maestro --access public"
+    "verify:packages": "node scripts/sync-skill-to-cli.mjs && node scripts/verify-packages.mjs",
+    "publish:cli": "node scripts/publish-cli.mjs maestro-skills",
+    "publish:scoped": "node scripts/publish-cli.mjs rodovalhofs-maestro"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.1",

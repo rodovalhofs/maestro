@@ -1,70 +1,87 @@
-# Política de segurança
+# Security policy
 
-## Escopo
+Maestro runs on developer machines and reads agent skill metadata. Its security
+model is therefore local-first, least-privilege, and explicit about external effects.
 
-Este repositório contém a skill **Maestro** e scripts Python/Node que rodam **localmente** na máquina do usuário. Não há servidor proprietário, telemetria nem envio de dados da busca de skills para os mantenedores deste repo.
+## Data boundaries
 
-## O que o Maestro lê localmente
+Manifest generation scans declared metadata from `SKILL.md` files under:
 
-Para indexar skills instaladas, os scripts podem ler **somente metadados** (nome, descrição, tags) de:
+- `~/.cursor/skills`, `~/.claude/skills`, `~/.codex/skills`, and `~/.agents/skills`;
+- Codex's local plugin cache;
+- equivalent skill directories inside the active project.
 
-| Pasta | Finalidade |
-|-------|------------|
-| `~/.cursor/skills` | Skills do Cursor |
-| `~/.claude/skills` | Skills do Claude Code |
-| `~/.codex/skills` | Skills do Codex |
-| `~/.agents/skills` | Skills universais |
-| `<projeto>/.cursor/skills` (e equivalentes) | Skills por projeto, se existirem |
+The manifest stores skill name, declared description/tags, domain, provenance, and
+local paths. If a description is absent, Maestro uses a neutral placeholder instead
+of copying body content. Files remain local under `~/.maestro/` unless the user moves
+or publishes them.
 
-**Gravação local:** `~/.maestro/skills-manifest.json`, `~/.maestro/skill-runbooks.user.json`, `~/.maestro/discover-allowlist.txt`, `~/.maestro/maestro-exclude.txt`.
+Do not commit `~/.maestro/`, manifests, user runbooks, or machine-specific paths to a
+public repository. Maestro does not collect telemetry and its local search, route,
+manifest, setup, remove, runbook, and doctor flows do not send prompts to maintainers.
 
-Nenhum conteúdo dessas pastas é enviado automaticamente para a internet pelo Maestro.
+## External discovery
 
-## Discover e skills remotas
+`discover.triggered` reports a possible catalog gap; it does not perform a request.
+The agent must show the target service and sanitized query, then obtain explicit
+network consent before using `npx skills find`.
 
-O fluxo **Discover** pode sugerir buscar skills em [skills.sh](https://skills.sh/) (`npx skills find`). **Instalar** (`npx skills add`) baixa código de repositórios GitHub de terceiros; o `SKILL.md` remoto passa a influenciar instruções do agente.
+Remote skill installation is a separate decision. Review the repository, its
+`SKILL.md`, scripts, dependencies, and maintainer identity before running a displayed
+`npx skills add` command. Maestro does not auto-install and does not add `-y`.
+`discover-allowlist.txt` records trust context only; it is never execution permission.
 
-### Política (desde v0.1.3)
+## Runbooks and command execution
 
-1. **Nunca** executar `npx skills add` automaticamente — apresente o comando para o usuário revisar e rodar manualmente.
-2. **Não** use a flag `-y` em exemplos do fluxo Discover no `SKILL.md`.
-3. Allowlist opcional: `~/.maestro/discover-allowlist.txt` (uma linha `owner/repo` por repo confiável). Mesmo na allowlist, instalação exige ação humana explícita.
-4. Revise o código-fonte no GitHub antes de instalar qualquer skill sugerida.
+Runbooks merge in this order: bundled, user, project. Invalid JSON and invalid entries
+fail closed and are reported in search output.
 
-Auditorias públicas em [skills.sh](https://www.skills.sh/rodovalhofs/maestro/maestro/security/agent-trust-hub) documentam esses vetores; as mitigações acima são intencionais.
+- Only bundled, required, `read_local` preflights may be enabled by default.
+- User/project preflights require confirmation.
+- Writes, network, remote installs, Git commits, and publishing require confirmation
+  regardless of provenance.
+- Consumers should execute `resolved_command` and `resolved_args` directly without a
+  shell, never concatenate them into an interpolated command string.
 
-## Runbooks e preflight
+Project runbooks are repository-controlled input. Review changes to
+`.maestro/skill-runbooks.json` like executable build configuration.
 
-Runbooks podem instruir a executar CLIs **locais** (ex.: `ui-ux-pro-max` `search.py`). Só execute preflight documentado no runbook bundled ou em arquivos do usuário (`~/.maestro/`, `.maestro/`). Não invente comandos de skills não instaladas.
+`scripts/sync-templates.ps1` is dry-run by default, requires a Git repository target,
+preserves existing files unless `-Force` is explicit, and never deletes the target's
+`.github` directory or unrelated files.
 
-## Versões suportadas
+## Installation and removal
 
-| Versão | Suportada |
-|--------|-----------|
-| `main` | Sim |
-| npm `maestro-skills` ≥ 0.1.3 | Sim |
+Skill replacement uses a staging directory and backup rename so a failed copy can
+restore the previous installation. Configuration is a versioned multi-project
+registry written through a temporary file. Project removal selects the exact
+registered project; home cleanup removes only Maestro-owned filenames and never
+recursively deletes an arbitrary `MAESTRO_HOME`.
 
-## O que reportar
+## Dependencies and releases
 
-- Execução insegura de comandos ou path traversal nos scripts
-- Leitura/escrita fora dos diretórios documentados sem consentimento
-- Instruções no `SKILL.md` que contornem confirmação humana no Discover
-- Vulnerabilidades em dependências de CI (GitHub Actions)
+The npm runtime has two direct dependencies: Commander and Clack Prompts. Release
+workflows must run the complete Python and Node test suites before publishing. Inspect
+the output of `npm pack --dry-run` for both packages and keep package versions aligned.
 
-**Fora de escopo:** vulnerabilidades em skills de terceiros já instaladas na sua máquina; o IDE Cursor/Claude em si.
+GitHub Actions use version tags with read-only repository permissions and checkout
+credentials disabled. Before a future workflow publication, maintainers should verify
+and pin the action tags to immutable upstream commit SHAs; this local-only change does
+not guess unverified hashes.
 
-## Como reportar
+## Supported versions
 
-1. **Não** abra Issue pública com detalhes de exploit.
-2. Abra um [Security Advisory](https://github.com/rodovalhofs/maestro/security/advisories/new) **ou** canal privado com o mantenedor.
-3. Inclua: versão/commit, SO, comando usado e impacto esperado.
+Security fixes are applied to `main` and the latest npm release. Older releases may
+not receive backports.
 
-Objetivo de resposta inicial: **7 dias úteis**.
+## Reporting a vulnerability
 
-## Boas práticas para quem instala
+Do not open a public issue containing exploit details, secrets, or private paths.
+Use a private GitHub Security Advisory for `rodovalhofs/maestro` and include:
 
-- Prefira `npx maestro-skills search` (CLI npm) em vez de paths manuais no PowerShell.
-- Revise pacotes retornados por `npx skills find` antes de instalar.
-- Use `~/.maestro/maestro-exclude.txt` para excluir skills sensíveis da busca.
-- Não commite `skill-runbooks.user.json` com paths internos ou segredos em repositórios públicos.
-- O script `scripts/sync-templates.ps1` **sobrescreve** `.github/` no destino — confira `-TargetRepo` antes de executar.
+- affected version or commit;
+- operating system and command;
+- minimal reproduction with secrets removed;
+- expected impact and suggested mitigation, if known.
+
+The target for an initial maintainer response is seven business days.

@@ -20,13 +20,11 @@ $map = @{
 $target = Join-Path $ScriptDir $map[$Command]
 
 if (Get-Command py -ErrorAction SilentlyContinue) {
-    $py = @("py", "-3")
+    & py -3 $target @Rest
 } elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $py = @("python")
+    & python $target @Rest
 } else {
     Write-Error "Python not found. Install Python 3.12+ or use: npx maestro-skills search"
     exit 1
 }
-
-& @py @($target) @Rest
 exit $LASTEXITCODE

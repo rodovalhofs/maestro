@@ -1,119 +1,97 @@
-# CLI `maestro-skills`
+# `maestro-skills` CLI
 
-Instalação interativa do Maestro para vários agentes de IA.
+The CLI installs, indexes, searches, diagnoses, and removes Maestro locally. The
+scoped package `@rodovalhofs/maestro` exposes the same surface through the `maestro`
+binary.
 
-## Comando principal
-
-```bash
-npx maestro-skills setup
-```
-
-Pacote npm: [maestro-skills](https://www.npmjs.com/package/maestro-skills)
-
-Alternativa scoped (bin `maestro`):
-
-```bash
-npx @rodovalhofs/maestro setup
-```
-
-## O que o setup faz
-
-1. Detecta agentes no sistema
-2. Você escolhe destinos (multi-select)
-3. Escolhe escopo: **global** (padrão) ou **este projeto** (`--project`)
-4. Copia a skill `maestro/` para cada pasta de skills
-5. Opcional: registra no [skills.sh](https://skills.sh/) — **sem `-y` automático**; revisão manual
-6. Migra manifest legado `~/.cursor/skills-manifest.json` → `~/.maestro/`
-7. Executa `build_manifest.py` (Python 3.12+)
-
-## Busca e roteamento (PowerShell-safe)
-
-Use o CLI npm em vez de `%USERPROFILE%` (não expande no PowerShell):
-
-```bash
-npx maestro-skills search "dashboard react" --json
-npx maestro-skills route --task "design UI" --task "fix CI" --json
-npx maestro-skills manifest --project-root .
-```
-
-PowerShell fallback:
-
-```powershell
-& "$env:USERPROFILE\.cursor\skills\maestro\scripts\invoke.ps1" search "..." --json
-```
-
-## Runbooks do usuário
-
-```bash
-npx maestro-skills runbook list
-npx maestro-skills runbook add my-skill --summary "..." --notes "..."
-npx maestro-skills runbook edit my-skill
-npx maestro-skills runbook init-allowlist
-```
-
-Arquivos:
-
-| Arquivo | Escopo |
-|---------|--------|
-| `skill-runbooks.json` (bundled) | Shipped com Maestro |
-| `~/.maestro/skill-runbooks.user.json` | Global do usuário |
-| `.maestro/skill-runbooks.json` | Por projeto (opcional) |
-
-## Agentes suportados
-
-| ID | Agente | Pasta global | CLI flag |
-|----|--------|--------------|----------|
-| `cursor` | Cursor | `~/.cursor/skills/maestro` | `--cursor` |
-| `claude` | Claude Code | `~/.claude/skills/maestro` | `--claude` |
-| `codex` | Codex | `~/.codex/skills/maestro` | `--codex` |
-| `universal` | Universal | `~/.agents/skills/maestro` | `--universal` |
-
-Novos agentes: edite `packages/maestro-skills/agents.json`.
-
-## Comandos setup/remove
+## Setup
 
 ```bash
 npx maestro-skills setup
 npx maestro-skills setup --codex --cursor -y
-npx maestro-skills setup --project
+npx maestro-skills setup --project --codex -y
+```
+
+Without target flags, interactive setup shows available destinations. `-y` selects
+only detected agents; it does not silently install into every supported directory.
+The registry at `~/.maestro/config.json` preserves global and per-project records.
+
+## Search and route
+
+```bash
+npx maestro-skills search "dashboard react"
+npx maestro-skills search "fix CI" --domain devops-git --project-root . --json
+npx maestro-skills route --task "design UI" --task "fix CI" --json
+```
+
+`search` and `route` print compact text by default. `--json` is the stable automation
+surface. `--domain` is a ranking hint, not a hard filter.
+
+`route` also accepts newline-delimited stdin:
+
+```bash
+printf "design UI\nfix CI\n" | npx maestro-skills route --json
+```
+
+## Manifest and diagnostics
+
+```bash
+npx maestro-skills manifest --project-root .
+npx maestro-skills doctor
+npx maestro-skills doctor --json
+```
+
+`doctor` checks Python, the bundled skill, manifest JSON, installation records, and
+user runbooks. It is read-only and does not use the network.
+
+## Runbooks
+
+```bash
+npx maestro-skills runbook list
+npx maestro-skills runbook add my-skill --summary "Lint" --notes "Run before changes"
+npx maestro-skills runbook edit my-skill
+npx maestro-skills runbook init-allowlist
+```
+
+Files merge from bundled `skill-runbooks.json`, then
+`~/.maestro/skill-runbooks.user.json`, then `<project>/.maestro/skill-runbooks.json`.
+Invalid files are reported and skipped.
+
+## Remove
+
+```bash
 npx maestro-skills remove
-npx maestro-skills remove -y --clean-home
+npx maestro-skills remove --project . -y
+npx maestro-skills remove --all -y
+npx maestro-skills remove --all -y --clean-home
 ```
 
-## Layout `~/.maestro/`
+`--project [path]` removes only that registered project. `--clean-home` deletes only
+known Maestro files, not the home directory or unrelated files.
 
-```text
-~/.maestro/
-├── skills-manifest.json
-├── maestro-exclude.txt
-├── skill-runbooks.user.json
-├── discover-allowlist.txt
-└── config.json
+## Supported destinations
+
+| Agent | Global skill directory | Flag |
+|-------|------------------------|------|
+| Cursor | `~/.cursor/skills` | `--cursor` |
+| Claude Code | `~/.claude/skills` | `--claude` |
+| Codex | `~/.codex/skills` | `--codex` |
+| Universal | `~/.agents/skills` | `--universal` |
+
+## PowerShell adapter
+
+Prefer the npm CLI. When calling an installed script directly, use PowerShell's call
+operator and `$env:USERPROFILE`:
+
+```powershell
+& "$env:USERPROFILE\.codex\skills\maestro\scripts\invoke.ps1" search "fix CI" --json
 ```
 
-O `build_manifest.py` indexa skills de `~/.cursor`, `~/.claude`, `~/.codex`, `~/.agents` e pastas de projeto. Veja [SECURITY.md](../SECURITY.md) para escopo de leitura local.
+## Exit behavior
 
-## Pré-requisitos
+- `0`: success;
+- `1`: invalid request or failed health check;
+- `2`: catalog unavailable/invalid;
+- `127`: Python unavailable.
 
-- **Node.js 18+** — CLI
-- **Python 3.12+** — manifest (`py -3` ou `python3`)
-
-## Desenvolvimento
-
-```bash
-node scripts/sync-skill-to-cli.mjs
-py -3 -m unittest discover -s tests -v
-cd packages/maestro-skills && npm test
-```
-
-## Publicação npm (mantenedores)
-
-Somente o mantenedor executa publish localmente:
-
-```bash
-npm login
-npm run publish:cli
-npm run publish:scoped
-```
-
-Ou workflow **Publish npm** com secret `NPM_TOKEN`.
+Errors include remediation and avoid Python tracebacks for expected user failures.

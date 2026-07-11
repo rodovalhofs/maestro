@@ -158,8 +158,7 @@ def apply_intent_boost(
             continue
         matched.append(str(profile.get("name", "")))
         multiplier = float(profile.get("score_multiplier", 1.0))
-        min_boost = float(profile.get("min_boost", 0.0))
-        adjusted = max(adjusted * multiplier, min_boost)
+        adjusted *= multiplier
         mode = str(profile.get("suggested_mode", "") or "")
         if mode:
             suggested_mode = mode
