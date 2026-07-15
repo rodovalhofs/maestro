@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import re
+
 DOMAINS: list[str] = [
     "web",
     "data-viz",
@@ -44,7 +46,7 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
         "security", "cybersecurity", "forensics", "malware", "pentest",
         "penetration", "threat", "incident response", "mitre", "attack",
         "vulnerability", "siem", "dfir", "red team", "blue team", "seguranca",
-        "forense", "volatility",
+        "segurança", "ciberseguranca", "cibersegurança", "forense", "volatility",
     ],
     "creative": [
         "moodboard", "logo", "ads", "brand", "creative", "shot", "scene",
@@ -91,9 +93,20 @@ HUB_SKILLS: set[str] = {
     "explore",
 }
 
+SECURITY_SAFE_EXECUTION_PATTERNS: list[str] = [
+    r"\bcom\s+seguran[cç]a\b",
+]
+
 
 def _text_blob(name: str, description: str) -> str:
     return f"{name} {description}".lower()
+
+
+def strip_safe_execution_phrases(text: str) -> str:
+    normalized = text
+    for pattern in SECURITY_SAFE_EXECUTION_PATTERNS:
+        normalized = re.sub(pattern, " ", normalized, flags=re.IGNORECASE)
+    return normalized
 
 
 def classify_skill(name: str, description: str) -> str:
@@ -119,10 +132,13 @@ def classify_skill(name: str, description: str) -> str:
 
 def classify_query(query: str) -> tuple[str, dict[str, int]]:
     query_lower = query.lower()
+    security_query = strip_safe_execution_phrases(query_lower)
+
     scores = {domain: 0 for domain in DOMAINS}
     for domain, keywords in DOMAIN_KEYWORDS.items():
+        searchable = security_query if domain == "security" else query_lower
         for kw in keywords:
-            if kw in query_lower:
+            if kw in searchable:
                 scores[domain] += 1
 
     best = max(scores, key=scores.get)
