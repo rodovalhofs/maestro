@@ -17,15 +17,17 @@ from search_skills import (  # noqa: E402
     load_manifest,
     search_skills,
 )
+from domains import DOMAINS  # noqa: E402
 
 
 def route_batch(
     tasks: list[str],
     manifest_path: Path,
+    domain: str | None = None,
 ) -> dict:
     manifest = load_manifest(manifest_path)
     results = [
-        search_skills(task.strip(), manifest)
+        search_skills(task.strip(), manifest, domain=domain)
         for task in tasks
         if task.strip()
     ]
@@ -80,6 +82,7 @@ def main() -> int:
         help="Task strings; omit and use stdin for batch mode",
     )
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -88,7 +91,7 @@ def main() -> int:
     else:
         tasks = [line.strip() for line in sys.stdin if line.strip()]
 
-    payload = route_batch(tasks, Path(args.manifest))
+    payload = route_batch(tasks, Path(args.manifest), domain=args.domain)
 
     if args.json or not sys.stdout.isatty():
         print(json.dumps(payload, indent=2, ensure_ascii=False))

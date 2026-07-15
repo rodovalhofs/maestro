@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -12,6 +14,7 @@ SCRIPTS = ROOT / "skills" / "maestro" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from concept_gaps import extract_concept_candidates, find_concept_gaps  # noqa: E402
+from domains import classify_query  # noqa: E402
 from intents import is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import build_routing, is_high_risk, select_mode  # noqa: E402
 from route_tasks import route_batch  # noqa: E402
@@ -50,6 +53,24 @@ class TestIntents(unittest.TestCase):
         intents = task_intents("npx skills find react")
         names = [i["name"] for i in intents]
         self.assertIn("skill-discovery", names)
+
+
+class TestDomains(unittest.TestCase):
+    def test_safe_execution_phrase_is_not_cybersecurity(self) -> None:
+        for query in (
+            "refatorar codigo legado com seguranca",
+            "refatorar código legado com segurança",
+        ):
+            domain, scores = classify_query(query)
+            self.assertEqual(domain, "general")
+            self.assertEqual(scores["security"], 0)
+
+    def test_explicit_security_context_remains_security(self) -> None:
+        domain, scores = classify_query(
+            "revisar segurança da aplicação e vulnerabilidades"
+        )
+        self.assertEqual(domain, "security")
+        self.assertGreater(scores["security"], 0)
 
 
 class TestRouting(unittest.TestCase):
@@ -137,6 +158,44 @@ class TestSearchSkills(unittest.TestCase):
         self.assertEqual(result["results"][0]["name"], "gh-fix-ci")
         self.assertFalse(result["discover"]["triggered"])
 
+    def test_safe_refactoring_outranks_security_for_safe_execution_phrase(self) -> None:
+        manifest = deepcopy(self.manifest)
+        manifest["skills"].extend(
+            [
+                {
+                    "name": "safe-refactoring",
+                    "folder": "safe-refactoring",
+                    "description": (
+                        "Refactor and restructure legacy code without changing "
+                        "observable behavior using regression tests"
+                    ),
+                    "tags": ["refactoring", "refatoracao", "legacy-code", "codigo-legado"],
+                    "domain": "general",
+                    "path": "/tmp/skills/safe-refactoring/SKILL.md",
+                    "scope": "project-agents",
+                    "installed": True,
+                },
+                {
+                    "name": "ransomware-security-analysis",
+                    "folder": "ransomware-security-analysis",
+                    "description": "Analyze ransomware and security incidents",
+                    "tags": ["ransomware", "seguranca", "malware"],
+                    "domain": "security",
+                    "path": "/tmp/skills/ransomware-security-analysis/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+            ]
+        )
+
+        result = search_skills(
+            "refatorar codigo legado com seguranca",
+            manifest,
+        )
+
+        self.assertEqual(result["domain"], "general")
+        self.assertEqual(result["results"][0]["name"], "safe-refactoring")
+
     def test_bypass_routing(self) -> None:
         result = search_skills("oi", self.manifest)
         self.assertEqual(result["routing"]["priority"], "P3")
@@ -155,6 +214,27 @@ class TestRouteBatch(unittest.TestCase):
         self.assertEqual(len(payload["results"]), 2)
         self.assertIn("routing", payload)
         self.assertIn("discover", payload)
+
+    def test_cli_accepts_domain(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPTS / "route_tasks.py"),
+                "--manifest",
+                str(FIXTURE_MANIFEST),
+                "--domain",
+                "general",
+                "--json",
+            ],
+            input="modelar dominio\n",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["task_count"], 1)
+        self.assertEqual(payload["results"][0]["domain"], "general")
 
 
 if __name__ == "__main__":

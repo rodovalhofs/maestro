@@ -14,7 +14,13 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from bm25 import BM25  # noqa: E402
 from concept_gaps import build_discover_queries, find_concept_gaps  # noqa: E402
-from domains import DOMAINS, HUB_SKILLS, classify_query, domain_label  # noqa: E402
+from domains import (  # noqa: E402
+    DOMAINS,
+    HUB_SKILLS,
+    classify_query,
+    domain_label,
+    strip_safe_execution_phrases,
+)
 from intents import apply_intent_boost, is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import (  # noqa: E402
     bm25_to_confidence,
@@ -137,7 +143,7 @@ def search_skills(
     high_risk = is_high_risk(query)
     force_discover = is_force_discover(query)
     intents = task_intents(query)
-    expanded_query = expand_query(query)
+    expanded_query = expand_query(strip_safe_execution_phrases(query))
 
     detected_domain, domain_scores = classify_query(query)
     active_domain = domain or detected_domain
