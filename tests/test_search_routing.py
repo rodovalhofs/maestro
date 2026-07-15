@@ -34,6 +34,11 @@ class TestSynonyms(unittest.TestCase):
         self.assertIn("debug", expanded)
         self.assertIn("test", expanded)
 
+    def test_short_synonyms_do_not_match_inside_requirements(self) -> None:
+        expanded = expand_query("entender requisitos e regras de negócio")
+        self.assertNotIn(" design", expanded)
+        self.assertNotIn(" github", expanded)
+
 
 class TestIntents(unittest.TestCase):
     def test_debug_intent_detected(self) -> None:
@@ -71,6 +76,12 @@ class TestDomains(unittest.TestCase):
         )
         self.assertEqual(domain, "security")
         self.assertGreater(scores["security"], 0)
+
+    def test_short_keywords_do_not_match_inside_portuguese_words(self) -> None:
+        domain, scores = classify_query("entender requisitos e regras de negócio")
+        self.assertEqual(domain, "general")
+        self.assertEqual(scores["design"], 0)
+        self.assertEqual(scores["devops-git"], 0)
 
 
 class TestRouting(unittest.TestCase):
@@ -195,6 +206,80 @@ class TestSearchSkills(unittest.TestCase):
 
         self.assertEqual(result["domain"], "general")
         self.assertEqual(result["results"][0]["name"], "safe-refactoring")
+
+    def test_auto_detected_domain_also_considers_general_skills(self) -> None:
+        manifest = {
+            "skills": [
+                {
+                    "name": "modular-system-architecture",
+                    "folder": "modular-system-architecture",
+                    "description": (
+                        "Design a modular and maintainable backend with module "
+                        "responsibilities and explicit dependencies"
+                    ),
+                    "tags": ["modular-architecture", "backend", "maintainability"],
+                    "domain": "general",
+                    "path": "/tmp/modular/SKILL.md",
+                    "scope": "project-agents",
+                    "installed": True,
+                },
+                *[
+                    {
+                        "name": f"web-helper-{index}",
+                        "folder": f"web-helper-{index}",
+                        "description": "Build a web backend application",
+                        "tags": ["web", "backend"],
+                        "domain": "web",
+                        "path": f"/tmp/web-{index}/SKILL.md",
+                        "scope": "agents",
+                        "installed": True,
+                    }
+                    for index in range(3)
+                ],
+            ]
+        }
+
+        result = search_skills(
+            "design a modular and maintainable backend",
+            manifest,
+        )
+
+        self.assertEqual(result["detected_domain"], "web")
+        self.assertEqual(result["results"][0]["name"], "modular-system-architecture")
+
+    def test_explicit_domain_remains_strict(self) -> None:
+        manifest = {
+            "skills": [
+                {
+                    "name": f"design-helper-{index}",
+                    "folder": f"design-helper-{index}",
+                    "description": "Design dashboard ui",
+                    "tags": ["design", "dashboard", "ui"],
+                    "domain": "design",
+                    "path": f"/tmp/design-{index}/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                }
+                for index in range(3)
+            ]
+            + [
+                {
+                    "name": "general-dashboard-planning",
+                    "folder": "general-dashboard-planning",
+                    "description": "Plan a dashboard",
+                    "tags": ["dashboard"],
+                    "domain": "general",
+                    "path": "/tmp/general-dashboard/SKILL.md",
+                    "scope": "project-agents",
+                    "installed": True,
+                }
+            ]
+        }
+
+        result = search_skills("design dashboard ui", manifest, domain="design")
+
+        self.assertTrue(result["results"])
+        self.assertTrue(all(item["domain"] == "design" for item in result["results"]))
 
     def test_bypass_routing(self) -> None:
         result = search_skills("oi", self.manifest)

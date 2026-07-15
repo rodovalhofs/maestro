@@ -150,7 +150,8 @@ def search_skills(
 
     pool = skills
     if active_domain != "general":
-        domain_pool = [s for s in skills if s.get("domain") == active_domain]
+        allowed_domains = {active_domain} if domain else {active_domain, "general"}
+        domain_pool = [s for s in skills if s.get("domain") in allowed_domains]
         if len(domain_pool) >= 3:
             pool = domain_pool
 
