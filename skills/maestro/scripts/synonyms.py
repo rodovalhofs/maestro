@@ -24,6 +24,13 @@ DEFAULT_SYNONYMS: dict[str, list[str]] = {
 }
 
 
+def _contains_phrase(text: str, phrase: str) -> bool:
+    return re.search(
+        rf"(?<!\w){re.escape(phrase.lower())}(?!\w)",
+        text.lower(),
+    ) is not None
+
+
 def expand_query(text: str, extra: dict[str, list[str]] | None = None) -> str:
     """Append canonical terms when synonym phrases appear in the query."""
     synonyms = {**DEFAULT_SYNONYMS, **(extra or {})}
@@ -38,7 +45,7 @@ def expand_query(text: str, extra: dict[str, list[str]] | None = None) -> str:
             continue
         for value in values:
             value_text = value.lower().strip()
-            if value_text and value_text in lowered:
+            if value_text and _contains_phrase(lowered, value_text):
                 extra_terms.append(canon)
                 break
 

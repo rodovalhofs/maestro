@@ -102,6 +102,14 @@ def _text_blob(name: str, description: str) -> str:
     return f"{name} {description}".lower()
 
 
+def contains_keyword(text: str, keyword: str) -> bool:
+    """Match taxonomy terms as words/phrases instead of arbitrary substrings."""
+    return re.search(
+        rf"(?<!\w){re.escape(keyword.lower())}(?!\w)",
+        text.lower(),
+    ) is not None
+
+
 def strip_safe_execution_phrases(text: str) -> str:
     normalized = text
     for pattern in SECURITY_SAFE_EXECUTION_PATTERNS:
@@ -121,7 +129,7 @@ def classify_skill(name: str, description: str) -> str:
     scores = {domain: 0 for domain in DOMAINS}
     for domain, keywords in DOMAIN_KEYWORDS.items():
         for kw in keywords:
-            if kw in blob:
+            if contains_keyword(blob, kw):
                 scores[domain] += 1
 
     best = max(scores, key=scores.get)
@@ -138,7 +146,7 @@ def classify_query(query: str) -> tuple[str, dict[str, int]]:
     for domain, keywords in DOMAIN_KEYWORDS.items():
         searchable = security_query if domain == "security" else query_lower
         for kw in keywords:
-            if kw in searchable:
+            if contains_keyword(searchable, kw):
                 scores[domain] += 1
 
     best = max(scores, key=scores.get)

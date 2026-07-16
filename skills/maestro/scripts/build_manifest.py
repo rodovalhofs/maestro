@@ -13,7 +13,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from domains import classify_skill  # noqa: E402
+from domains import DOMAINS, classify_skill  # noqa: E402
 from maestro_paths import (  # noqa: E402
     EXCLUDE_PATH,
     MANIFEST_PATH,
@@ -35,7 +35,13 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     def flush() -> None:
         nonlocal current_key, current_lines
         if current_key is not None:
-            result[current_key] = "\n".join(current_lines).strip().strip('"').strip("'")
+            scalar_style = current_lines[0] if current_lines else ""
+            if scalar_style in {">", ">-", "|", "|-"}:
+                separator = " " if scalar_style.startswith(">") else "\n"
+                value = separator.join(current_lines[1:])
+            else:
+                value = "\n".join(current_lines)
+            result[current_key] = value.strip().strip('"').strip("'")
         current_key = None
         current_lines = []
 
@@ -91,6 +97,16 @@ def load_exclude_list() -> set[str]:
     return names
 
 
+def resolve_skill_domain(name: str, description: str, raw_domain: str) -> str:
+    """Prefer a valid declared domain and infer only when it is absent or invalid."""
+    declared = raw_domain.strip().lower()
+    if declared == "cybersecurity":
+        declared = "security"
+    if declared in DOMAINS:
+        return declared
+    return classify_skill(name, description)
+
+
 def iter_skill_dirs(root: Path, scope: str) -> list[dict]:
     if not root.is_dir():
         return []
@@ -115,11 +131,7 @@ def iter_skill_dirs(root: Path, scope: str) -> list[dict]:
         if not description:
             description = text[:400].replace("\n", " ")
 
-        raw_domain = meta.get("domain", "")
-        if raw_domain.lower() in {"cybersecurity", "security"}:
-            skill_domain = "security"
-        else:
-            skill_domain = classify_skill(name, description)
+        skill_domain = resolve_skill_domain(name, description, meta.get("domain", ""))
 
         tags = parse_tags_from_text(text)
 
