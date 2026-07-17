@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from math import log
+
+from text_normalization import search_tokens
 
 
 class BM25:
@@ -20,8 +21,7 @@ class BM25:
         self.n = 0
 
     def tokenize(self, text: str) -> list[str]:
-        text = re.sub(r"[^\w\s]", " ", str(text).lower())
-        return [w for w in text.split() if len(w) > 2]
+        return search_tokens(text)
 
     def fit(self, documents: list[str]) -> None:
         self.corpus = [self.tokenize(doc) for doc in documents]

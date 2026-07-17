@@ -36,6 +36,8 @@ npx maestro-skills route --task "design UI" --task "fix CI" --json
 npx maestro-skills manifest --project-root .
 ```
 
+A busca trata consultas com e sem acentos como equivalentes. Nos resultados JSON, `metadata_boost` e `metadata_matches` explicam quando um nome, pasta ou tag completa desempatou o ranking; o boost usa apenas a melhor correspondência e não recompensa quantidade de tags.
+
 PowerShell fallback:
 
 ```powershell

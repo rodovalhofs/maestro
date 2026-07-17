@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from text_normalization import fold_text, search_tokens
+
 MAX_DISCOVER_GAPS = 2
 
 STOPWORDS: frozenset[str] = frozenset(
@@ -18,7 +20,9 @@ STOPWORDS: frozenset[str] = frozenset(
         "codigo",
         "código",
         "alteracao",
-        "alteração",
+        "mudanca",
+        "change",
+        "changes",
         "fazer",
         "vamos",
         "projeto",
@@ -43,7 +47,7 @@ STOPWORDS: frozenset[str] = frozenset(
 IMPLEMENTATION_VERB_PATTERN = re.compile(
     r"\b(?:colocar|usar|implementar|adicionar|integrar|instalar|"
     r"add|use|implement|integrate|install)\s+"
-    r"([a-z][a-z0-9._/-]*)",
+    r"([\w][\w._/-]*)",
     re.IGNORECASE,
 )
 
@@ -55,7 +59,7 @@ CONCEPT_GAP_SCORE_THRESHOLD = 1.5
 
 
 def _normalize_term(term: str) -> str:
-    return term.strip().lower().replace("_", "-")
+    return fold_text(term).strip().replace("_", "-")
 
 
 def is_stopword(term: str) -> bool:
@@ -99,9 +103,10 @@ def extract_concept_candidates(query: str) -> list[str]:
     for match in IMPLEMENTATION_VERB_PATTERN.finditer(query):
         add(match.group(1))
 
-    for pattern in (HYPHENATED_PATTERN, CAMEL_CASE_PATTERN):
-        for match in pattern.finditer(query):
-            add(match.group(1))
+    for match in HYPHENATED_PATTERN.finditer(fold_text(query)):
+        add(match.group(1))
+    for match in CAMEL_CASE_PATTERN.finditer(query):
+        add(match.group(1))
 
     ordered.sort(key=_concept_specificity, reverse=True)
     return ordered
@@ -111,14 +116,14 @@ def _result_covers_term(term: str, results: list[dict[str, Any]]) -> bool:
     normalized = _normalize_term(term)
     compact = normalized.replace("-", "")
     for skill in results:
-        blob = " ".join(
+        blob = fold_text(" ".join(
             [
                 str(skill.get("name", "")),
                 str(skill.get("folder", "")),
                 str(skill.get("description", "")),
                 " ".join(str(t) for t in (skill.get("tags") or [])),
             ]
-        ).lower()
+        ))
         blob_compact = blob.replace("-", "").replace("_", "")
         if normalized in blob or compact in blob_compact:
             return True
@@ -184,7 +189,9 @@ def build_discover_queries(
     context_tokens: list[str] = []
     if domain and domain not in {"general", "meta"}:
         context_tokens.append(domain.replace("-", " "))
-    for token in re.findall(r"[a-z]{4,}", full_query.lower()):
+    for token in search_tokens(full_query):
+        if len(token) < 4:
+            continue
         if token not in STOPWORDS and token not in context_tokens:
             context_tokens.append(token)
 

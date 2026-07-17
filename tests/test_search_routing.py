@@ -14,11 +14,12 @@ SCRIPTS = ROOT / "skills" / "maestro" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from concept_gaps import extract_concept_candidates, find_concept_gaps  # noqa: E402
+from bm25 import BM25  # noqa: E402
 from domains import classify_query  # noqa: E402
 from intents import is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import build_routing, is_high_risk, select_mode  # noqa: E402
 from route_tasks import route_batch  # noqa: E402
-from search_skills import search_skills, skill_document  # noqa: E402
+from search_skills import metadata_match_boost, search_skills, skill_document  # noqa: E402
 from synonyms import expand_query  # noqa: E402
 
 FIXTURE_MANIFEST = Path(__file__).parent / "fixtures" / "sample-manifest.json"
@@ -38,6 +39,44 @@ class TestSynonyms(unittest.TestCase):
         expanded = expand_query("entender requisitos e regras de negócio")
         self.assertNotIn(" design", expanded)
         self.assertNotIn(" github", expanded)
+
+
+class TestTextNormalization(unittest.TestCase):
+    def test_bm25_matches_accented_and_unaccented_text(self) -> None:
+        bm25 = BM25()
+        bm25.fit(["mudança código segurança"])
+
+        accented = bm25.score("mudança código segurança")[0][1]
+        unaccented = bm25.score("mudanca codigo seguranca")[0][1]
+
+        self.assertGreater(accented, 0)
+        self.assertAlmostEqual(accented, unaccented)
+
+    def test_metadata_phrase_match_respects_token_boundaries(self) -> None:
+        boost, matches = metadata_match_boost(
+            "encode smells in a diagnostic payload",
+            {
+                "name": "unrelated-skill",
+                "folder": "unrelated-skill",
+                "tags": ["code-smells"],
+            },
+        )
+
+        self.assertEqual(0.0, boost)
+        self.assertEqual([], matches)
+
+    def test_metadata_boost_does_not_accumulate_with_tag_quantity(self) -> None:
+        boost, matches = metadata_match_boost(
+            "diagnose code smells",
+            {
+                "name": "unrelated-skill",
+                "folder": "unrelated-skill",
+                "tags": ["code-smells", "code_smells", "code smells"],
+            },
+        )
+
+        self.assertEqual(3.0, boost)
+        self.assertEqual(3, len(matches))
 
 
 class TestIntents(unittest.TestCase):
@@ -107,6 +146,14 @@ class TestConceptGaps(unittest.TestCase):
         query = "melhorar a ui do app"
         candidates = extract_concept_candidates(query)
         self.assertNotIn("ui", candidates)
+
+    def test_generic_change_is_not_a_concept_gap_candidate(self) -> None:
+        for query in (
+            "implementar mudança local com testes",
+            "implementar mudanca local com testes",
+            "implement change safely",
+        ):
+            self.assertEqual([], extract_concept_candidates(query))
 
 
 class TestSearchSkills(unittest.TestCase):
@@ -206,6 +253,56 @@ class TestSearchSkills(unittest.TestCase):
 
         self.assertEqual(result["domain"], "general")
         self.assertEqual(result["results"][0]["name"], "safe-refactoring")
+
+    def test_complete_tag_match_outranks_incidental_description_terms(self) -> None:
+        manifest = {
+            "skills": [
+                {
+                    "name": "clean-code-implementation",
+                    "folder": "clean-code-implementation",
+                    "description": (
+                        "Implementar ou melhorar uma mudança local com código legível; "
+                        "usar ao alterar funções e erros"
+                    ),
+                    "tags": ["codigo-limpo", "clean-code", "implementacao"],
+                    "domain": "general",
+                    "path": "/tmp/clean-code/SKILL.md",
+                    "scope": "project-agents",
+                },
+                {
+                    "name": "code-smell-detection",
+                    "folder": "code-smell-detection",
+                    "description": (
+                        "Detectar e priorizar deterioração com evidências; não modificar código"
+                    ),
+                    "tags": ["maus-cheiros", "code-smells", "diagnostico"],
+                    "domain": "general",
+                    "path": "/tmp/code-smells/SKILL.md",
+                    "scope": "project-agents",
+                },
+                {
+                    "name": "safe-refactoring",
+                    "folder": "safe-refactoring",
+                    "description": "Refatorar código preservando comportamento",
+                    "tags": ["refatoracao", "legacy-code"],
+                    "domain": "general",
+                    "path": "/tmp/refactoring/SKILL.md",
+                    "scope": "project-agents",
+                },
+            ]
+        }
+
+        result = search_skills(
+            "diagnosticar code smells sem alterar codigo",
+            manifest,
+            domain="general",
+        )
+
+        self.assertEqual("code-smell-detection", result["results"][0]["name"])
+        self.assertEqual(3.0, result["results"][0]["metadata_boost"])
+        self.assertIn("tag:code-smells", result["results"][0]["metadata_matches"])
+        self.assertFalse(result["weak_match"])
+        self.assertFalse(result["discover"]["triggered"])
 
     def test_auto_detected_domain_also_considers_general_skills(self) -> None:
         manifest = {
