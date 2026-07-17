@@ -31,6 +31,7 @@ from routing import (  # noqa: E402
 from maestro_paths import LEGACY_MANIFEST_PATH, MANIFEST_PATH  # noqa: E402
 from runbooks import attach_runbooks, load_discover_allowlist, load_runbooks  # noqa: E402
 from synonyms import expand_query  # noqa: E402
+from text_normalization import searchable_phrase, search_tokens  # noqa: E402
 
 
 def default_manifest_path() -> Path:
@@ -45,6 +46,9 @@ DEFAULT_MANIFEST = default_manifest_path()
 WEAK_SCORE_THRESHOLD = 1.5
 WEAK_SPREAD_RATIO = 0.10
 DEFAULT_MAX_RESULTS = 5
+NAME_PHRASE_BOOST = 4.0
+TAG_PHRASE_BOOST = 3.0
+SINGLE_METADATA_TOKEN_BOOST = 0.75
 
 
 def load_manifest(path: Path) -> dict:
@@ -62,6 +66,47 @@ def skill_document(skill: dict[str, Any]) -> str:
         f"{skill['name']} {skill.get('folder', '')} "
         f"{skill.get('description', '')} {tag_text} {skill.get('domain', '')}"
     )
+
+
+def metadata_match_boost(
+    query: str, skill: dict[str, Any]
+) -> tuple[float, list[str]]:
+    """Boost complete name/folder/tag matches without rewarding tag quantity."""
+    query_phrase = searchable_phrase(query)
+    query_tokens = set(search_tokens(query))
+    if not query_phrase:
+        return 0.0, []
+
+    matches: list[tuple[float, str]] = []
+    identities = {
+        str(skill.get("name", "")),
+        str(skill.get("folder", "")),
+    }
+    for identity in identities:
+        phrase = searchable_phrase(identity)
+        if (
+            phrase
+            and len(phrase.split()) >= 2
+            and f" {phrase} " in f" {query_phrase} "
+        ):
+            matches.append((NAME_PHRASE_BOOST, f"name:{identity}"))
+
+    raw_tags = skill.get("tags") or []
+    tags = raw_tags if isinstance(raw_tags, list) else [raw_tags]
+    for raw_tag in tags:
+        tag = str(raw_tag)
+        tokens = search_tokens(tag)
+        phrase = " ".join(tokens)
+        if len(tokens) >= 2 and f" {phrase} " in f" {query_phrase} ":
+            matches.append((TAG_PHRASE_BOOST, f"tag:{tag}"))
+        elif len(tokens) == 1 and len(tokens[0]) >= 4 and tokens[0] in query_tokens:
+            matches.append((SINGLE_METADATA_TOKEN_BOOST, f"tag:{tag}"))
+
+    if not matches:
+        return 0.0, []
+    highest = max(score for score, _ in matches)
+    evidence = sorted({label for score, label in matches if score == highest})
+    return highest, evidence
 
 
 def build_discover(
@@ -172,6 +217,8 @@ def search_skills(
         adjusted, intent_boosts, suggested_mode = apply_intent_boost(
             score, skill["name"], skill_text, intents
         )
+        metadata_boost, metadata_matches = metadata_match_boost(query, skill)
+        adjusted += metadata_boost
         confidence = bm25_to_confidence(adjusted)
         mode = select_mode(confidence, high_risk, suggested_mode, bypass=bypass)
 
@@ -185,6 +232,9 @@ def search_skills(
         }
         if intent_boosts:
             entry["intent_boosts"] = intent_boosts
+        if metadata_boost:
+            entry["metadata_boost"] = round(metadata_boost, 4)
+            entry["metadata_matches"] = metadata_matches
         results.append(entry)
 
     results.sort(key=lambda item: item["score"], reverse=True)
