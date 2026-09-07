@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Source = (Resolve-Path (Join-Path $PSScriptRoot "..\templates")).Path
-$Target = (Resolve-Path -LiteralPath $TargetRepo).Path
+$Target = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $TargetRepo).Path)
 $GitMarker = Join-Path $Target ".git"
 
 if (-not (Test-Path -LiteralPath $GitMarker)) {
