@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 DOMAINS: list[str] = [
     "web",
@@ -23,13 +24,13 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "web": [
         "react", "nextjs", "next.js", "frontend", "backend", "api", "typescript",
         "javascript", "shadcn", "stripe", "supabase", "postgres", "tailwind",
-        "component", "browser", "testing", "debug", "remix", "vue", "svelte",
+        "component", "browser", "remix", "vue", "svelte",
         "html", "css", "web app", "full-stack", "auth", "payment",
     ],
     "data-viz": [
-        "chart", "graph", "visualization", "dashboard", "d3", "canvas", "threejs",
-        "geospatial", "map", "gantt", "diagram", "scrollytelling", "plot",
-        "accessibility", "svg", "webgl", "painel",
+        "chart", "visualization", "dashboard", "d3", "canvas", "threejs",
+        "geospatial", "gantt", "diagram", "scrollytelling", "plot",
+        "svg", "webgl", "painel",
     ],
     "analytics": [
         "data quality", "kpi", "jupyter", "notebook", "metric", "report",
@@ -37,16 +38,16 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
         "pandas", "sql", "spreadsheet", "excel",
     ],
     "design": [
-        "prototype", "ideate", "audit", "design qa", "ux research", "figma",
+        "prototype", "ideate", "design audit", "design qa", "ux research", "figma",
         "mockup", "wireframe", "ui", "ux", "product design", "url-to-code",
         "image-to-code", "user flow", "onboarding", "superdesign", "design system",
-        "interface", "layout",
+        "user interface", "layout",
     ],
     "security": [
         "security", "cybersecurity", "forensics", "malware", "pentest",
         "penetration", "threat", "incident response", "mitre", "attack",
         "vulnerability", "siem", "dfir", "red team", "blue team", "seguranca",
-        "segurança", "ciberseguranca", "cibersegurança", "forense", "volatility",
+        "forense", "volatility",
     ],
     "creative": [
         "moodboard", "logo", "ads", "brand", "creative", "shot", "scene",
@@ -69,6 +70,9 @@ DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "meta": [
         "skill creator", "skill installer", "plugin creator", "create skill",
         "openai docs", "imagegen", "context7", "documentation library",
+        "architecture", "arquitetura", "codebase", "repository", "repositorio",
+        "repositório", "refactor", "refatorar", "routing", "roteamento",
+        "orchestration", "orquestracao", "orquestração",
     ],
 }
 
@@ -93,28 +97,23 @@ HUB_SKILLS: set[str] = {
     "explore",
 }
 
-SECURITY_SAFE_EXECUTION_PATTERNS: list[str] = [
-    r"\bcom\s+seguran[cç]a\b",
-]
-
 
 def _text_blob(name: str, description: str) -> str:
-    return f"{name} {description}".lower()
+    return _normalize(f"{name} {description}")
 
 
-def contains_keyword(text: str, keyword: str) -> bool:
-    """Match taxonomy terms as words/phrases instead of arbitrary substrings."""
-    return re.search(
-        rf"(?<!\w){re.escape(keyword.lower())}(?!\w)",
-        text.lower(),
-    ) is not None
+def _normalize(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", str(text).casefold())
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
-def strip_safe_execution_phrases(text: str) -> str:
-    normalized = text
-    for pattern in SECURITY_SAFE_EXECUTION_PATTERNS:
-        normalized = re.sub(pattern, " ", normalized, flags=re.IGNORECASE)
-    return normalized
+def _contains_keyword(text: str, keyword: str) -> bool:
+    normalized_text = _normalize(text)
+    normalized_keyword = _normalize(keyword).strip()
+    if not normalized_keyword:
+        return False
+    pattern = r"(?<!\w)" + re.escape(normalized_keyword).replace(r"\ ", r"\s+") + r"(?!\w)"
+    return re.search(pattern, normalized_text) is not None
 
 
 def classify_skill(name: str, description: str) -> str:
@@ -129,30 +128,33 @@ def classify_skill(name: str, description: str) -> str:
     scores = {domain: 0 for domain in DOMAINS}
     for domain, keywords in DOMAIN_KEYWORDS.items():
         for kw in keywords:
-            if contains_keyword(blob, kw):
+            if _contains_keyword(blob, kw):
                 scores[domain] += 1
 
-    best = max(scores, key=scores.get)
-    if scores[best] > 0:
-        return best
+    best_score = max(scores.values())
+    if best_score > 0:
+        winners = [domain for domain, score in scores.items() if score == best_score]
+        return winners[0] if len(winners) == 1 else "general"
     return "general"
 
 
-def classify_query(query: str) -> tuple[str, dict[str, int]]:
-    query_lower = query.lower()
-    security_query = strip_safe_execution_phrases(query_lower)
+def strip_safe_execution_phrases(text: str) -> str:
+    return re.sub(r"\bcom\s+seguranca\b", " ", _normalize(text), flags=re.IGNORECASE)
 
+
+def classify_query(query: str) -> tuple[str, dict[str, int]]:
     scores = {domain: 0 for domain in DOMAINS}
     for domain, keywords in DOMAIN_KEYWORDS.items():
-        searchable = security_query if domain == "security" else query_lower
+        searchable = strip_safe_execution_phrases(query) if domain == "security" else query
         for kw in keywords:
-            if contains_keyword(searchable, kw):
+            if _contains_keyword(searchable, kw):
                 scores[domain] += 1
 
-    best = max(scores, key=scores.get)
-    if scores[best] == 0:
+    best_score = max(scores.values())
+    if best_score == 0:
         return "general", scores
-    return best, scores
+    winners = [domain for domain, score in scores.items() if score == best_score]
+    return (winners[0] if len(winners) == 1 else "general"), scores
 
 
 def domain_label(domain: str) -> str:

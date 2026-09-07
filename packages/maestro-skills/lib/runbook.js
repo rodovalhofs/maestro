@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { writeFileAtomic } from "./atomic-file.js";
 import { getMaestroPaths } from "./paths.js";
 
 const USER_RUNBOOKS = () => join(getMaestroPaths().home, "skill-runbooks.user.json");
@@ -13,17 +14,22 @@ export function loadUserRunbooks() {
   if (!existsSync(path)) return { path, data: emptyUserRunbooks() };
   try {
     const data = JSON.parse(readFileSync(path, "utf8"));
-    if (!data.skills || typeof data.skills !== "object") data.skills = {};
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("top-level value must be an object");
+    }
+    if (data.skills === undefined) data.skills = {};
+    if (!data.skills || typeof data.skills !== "object" || Array.isArray(data.skills)) {
+      throw new Error("field 'skills' must be an object");
+    }
     return { path, data };
-  } catch {
-    return { path, data: emptyUserRunbooks() };
+  } catch (error) {
+    throw new Error(`Invalid JSON or schema in ${path}: ${error.message || error}`);
   }
 }
 
 export function saveUserRunbooks(data) {
   const path = USER_RUNBOOKS();
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf8");
+  writeFileAtomic(path, JSON.stringify(data, null, 2) + "\n");
   return path;
 }
 
@@ -72,7 +78,7 @@ export function discoverAllowlistPath() {
 export function discoverAllowlistExample() {
   return [
     "# One GitHub repo per line (owner/repo or owner/repo@skill)",
-    "# Only listed repos may be auto-installed when you explicitly allow it.",
+    "# Maestro never auto-installs. This list only records repositories you reviewed.",
     "# Example:",
     "# rodovalhofs/maestro",
     "",

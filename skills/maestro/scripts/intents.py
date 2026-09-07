@@ -110,8 +110,8 @@ FORCE_DISCOVER_PATTERNS: list[str] = [
 ]
 
 BYPASS_PATTERNS = [
-    r"^\s*(hi|hello|hey|oi|ola|olá)\b",
-    r"^\s*(what time|que horas)\b",
+    r"^\s*(hi|hello|hey|oi|ola|olá)[!.,\s]*$",
+    r"^\s*(what time is it|que horas são|que horas sao)[?!.\s]*$",
 ]
 
 
@@ -158,8 +158,7 @@ def apply_intent_boost(
             continue
         matched.append(str(profile.get("name", "")))
         multiplier = float(profile.get("score_multiplier", 1.0))
-        min_boost = float(profile.get("min_boost", 0.0))
-        adjusted = max(adjusted * multiplier, min_boost)
+        adjusted *= multiplier
         mode = str(profile.get("suggested_mode", "") or "")
         if mode:
             suggested_mode = mode

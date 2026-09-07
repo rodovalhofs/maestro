@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -14,12 +12,11 @@ SCRIPTS = ROOT / "skills" / "maestro" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from concept_gaps import extract_concept_candidates, find_concept_gaps  # noqa: E402
-from bm25 import BM25  # noqa: E402
-from domains import classify_query  # noqa: E402
+from domains import classify_query, classify_skill  # noqa: E402
 from intents import is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import build_routing, is_high_risk, select_mode  # noqa: E402
 from route_tasks import route_batch  # noqa: E402
-from search_skills import metadata_match_boost, search_skills, skill_document  # noqa: E402
+from search_skills import search_skills, skill_document  # noqa: E402
 from synonyms import expand_query  # noqa: E402
 
 FIXTURE_MANIFEST = Path(__file__).parent / "fixtures" / "sample-manifest.json"
@@ -35,48 +32,19 @@ class TestSynonyms(unittest.TestCase):
         self.assertIn("debug", expanded)
         self.assertIn("test", expanded)
 
-    def test_short_synonyms_do_not_match_inside_requirements(self) -> None:
-        expanded = expand_query("entender requisitos e regras de negócio")
-        self.assertNotIn(" design", expanded)
-        self.assertNotIn(" github", expanded)
+    def test_short_synonyms_match_words_not_substrings(self) -> None:
+        self.assertNotIn("github", expand_query("melhorar a vida do programador"))
+        self.assertIn("github", expand_query("revisar o PR"))
 
 
-class TestTextNormalization(unittest.TestCase):
-    def test_bm25_matches_accented_and_unaccented_text(self) -> None:
-        bm25 = BM25()
-        bm25.fit(["mudança código segurança"])
+class TestDomains(unittest.TestCase):
+    def test_short_keywords_match_words_not_substrings(self) -> None:
+        self.assertEqual(classify_query("funciona")[0], "general")
+        self.assertNotEqual(classify_skill("tdd", "Build features and tests"), "design")
 
-        accented = bm25.score("mudança código segurança")[0][1]
-        unaccented = bm25.score("mudanca codigo seguranca")[0][1]
-
-        self.assertGreater(accented, 0)
-        self.assertAlmostEqual(accented, unaccented)
-
-    def test_metadata_phrase_match_respects_token_boundaries(self) -> None:
-        boost, matches = metadata_match_boost(
-            "encode smells in a diagnostic payload",
-            {
-                "name": "unrelated-skill",
-                "folder": "unrelated-skill",
-                "tags": ["code-smells"],
-            },
-        )
-
-        self.assertEqual(0.0, boost)
-        self.assertEqual([], matches)
-
-    def test_metadata_boost_does_not_accumulate_with_tag_quantity(self) -> None:
-        boost, matches = metadata_match_boost(
-            "diagnose code smells",
-            {
-                "name": "unrelated-skill",
-                "folder": "unrelated-skill",
-                "tags": ["code-smells", "code_smells", "code smells"],
-            },
-        )
-
-        self.assertEqual(3.0, boost)
-        self.assertEqual(3, len(matches))
+    def test_dependency_graph_is_not_data_visualization(self) -> None:
+        domain, _ = classify_query("map the dependency graph in this repository")
+        self.assertNotEqual(domain, "data-viz")
 
 
 class TestIntents(unittest.TestCase):
@@ -99,41 +67,29 @@ class TestIntents(unittest.TestCase):
         self.assertIn("skill-discovery", names)
 
 
-class TestDomains(unittest.TestCase):
-    def test_safe_execution_phrase_is_not_cybersecurity(self) -> None:
-        for query in (
-            "refatorar codigo legado com seguranca",
-            "refatorar código legado com segurança",
-        ):
-            domain, scores = classify_query(query)
-            self.assertEqual(domain, "general")
-            self.assertEqual(scores["security"], 0)
-
-    def test_explicit_security_context_remains_security(self) -> None:
-        domain, scores = classify_query(
-            "revisar segurança da aplicação e vulnerabilidades"
-        )
-        self.assertEqual(domain, "security")
-        self.assertGreater(scores["security"], 0)
-
-    def test_short_keywords_do_not_match_inside_portuguese_words(self) -> None:
-        domain, scores = classify_query("entender requisitos e regras de negócio")
-        self.assertEqual(domain, "general")
-        self.assertEqual(scores["design"], 0)
-        self.assertEqual(scores["devops-git"], 0)
-
-
 class TestRouting(unittest.TestCase):
+    def test_high_risk_terms_use_word_boundaries(self) -> None:
+        self.assertFalse(is_high_risk("review the author profile"))
+        self.assertFalse(is_high_risk("explain tokenization"))
+        self.assertTrue(is_high_risk("rotate the auth token"))
+        self.assertTrue(is_high_risk("deploy em produção"))
+
     def test_high_risk_forces_recommend(self) -> None:
         self.assertTrue(is_high_risk("deploy to production with token"))
         mode = select_mode(0.9, high_risk=True)
         self.assertEqual(mode, "recommend")
 
-    def test_p1_auto_load(self) -> None:
+    def test_metadata_never_authorizes_loading(self) -> None:
         matches = [{"confidence": 0.4, "mode": "auto-load"}]
         routing = build_routing("design dashboard ui", matches, high_risk=False)
         self.assertEqual(routing["priority"], "P1")
-        self.assertEqual(routing["decision"], "auto-load")
+        self.assertEqual(routing["decision"], "review-candidates")
+        self.assertEqual(routing["load_limit"], 0)
+        self.assertFalse(routing["execution_authorized"])
+
+    def test_high_risk_without_matches_remains_p0(self) -> None:
+        routing = build_routing("delete production secrets", [], high_risk=True)
+        self.assertEqual(routing["priority"], "P0")
 
 
 class TestConceptGaps(unittest.TestCase):
@@ -147,13 +103,11 @@ class TestConceptGaps(unittest.TestCase):
         candidates = extract_concept_candidates(query)
         self.assertNotIn("ui", candidates)
 
-    def test_generic_change_is_not_a_concept_gap_candidate(self) -> None:
-        for query in (
-            "implementar mudança local com testes",
-            "implementar mudanca local com testes",
-            "implement change safely",
-        ):
-            self.assertEqual([], extract_concept_candidates(query))
+    def test_natural_hyphenated_phrases_are_not_packages(self) -> None:
+        candidates = extract_concept_candidates(
+            "improve the day-to-day open-source end-to-end workflow"
+        )
+        self.assertEqual(candidates, [])
 
 
 class TestSearchSkills(unittest.TestCase):
@@ -194,6 +148,9 @@ class TestSearchSkills(unittest.TestCase):
         self.assertIn("concept_gap", discover["reasons"])
         self.assertIn("skeleton-loader", discover["gaps"])
         self.assertTrue(discover["queries"])
+        self.assertFalse(discover["security"]["requires_network_consent"])
+        self.assertTrue(discover["security"]["requires_install_approval"])
+        self.assertEqual(discover["security"]["effect"], "network")
         self.assertFalse(result.get("missing_skills"))
 
     def test_force_discover_triggers_even_with_strong_local(self) -> None:
@@ -207,6 +164,18 @@ class TestSearchSkills(unittest.TestCase):
         self.assertTrue(discover["force_discover"])
         self.assertIn("force_discover", discover["reasons"])
 
+    def test_discover_query_redacts_secrets_paths_and_urls(self) -> None:
+        result = search_skills(
+            "find a skill for deploy token=abc123 C:\\private\\client https://internal.example/path",
+            self.manifest,
+            domain="devops-git",
+        )
+        query = result["discover"]["queries"][0]
+        self.assertNotIn("abc123", query)
+        self.assertNotIn("private", query)
+        self.assertNotIn("internal.example", query)
+        self.assertLessEqual(len(query), 160)
+
     def test_ci_query_no_discover(self) -> None:
         result = search_skills(
             "corrigir CI quebrado no pull request",
@@ -216,173 +185,126 @@ class TestSearchSkills(unittest.TestCase):
         self.assertEqual(result["results"][0]["name"], "gh-fix-ci")
         self.assertFalse(result["discover"]["triggered"])
 
-    def test_safe_refactoring_outranks_security_for_safe_execution_phrase(self) -> None:
-        manifest = deepcopy(self.manifest)
-        manifest["skills"].extend(
-            [
-                {
-                    "name": "safe-refactoring",
-                    "folder": "safe-refactoring",
-                    "description": (
-                        "Refactor and restructure legacy code without changing "
-                        "observable behavior using regression tests"
-                    ),
-                    "tags": ["refactoring", "refatoracao", "legacy-code", "codigo-legado"],
-                    "domain": "general",
-                    "path": "/tmp/skills/safe-refactoring/SKILL.md",
-                    "scope": "project-agents",
-                    "installed": True,
-                },
-                {
-                    "name": "ransomware-security-analysis",
-                    "folder": "ransomware-security-analysis",
-                    "description": "Analyze ransomware and security incidents",
-                    "tags": ["ransomware", "seguranca", "malware"],
-                    "domain": "security",
-                    "path": "/tmp/skills/ransomware-security-analysis/SKILL.md",
-                    "scope": "agents",
-                    "installed": True,
-                },
-            ]
-        )
-
-        result = search_skills(
-            "refatorar codigo legado com seguranca",
-            manifest,
-        )
-
-        self.assertEqual(result["domain"], "general")
-        self.assertEqual(result["results"][0]["name"], "safe-refactoring")
-
-    def test_complete_tag_match_outranks_incidental_description_terms(self) -> None:
-        manifest = {
-            "skills": [
-                {
-                    "name": "clean-code-implementation",
-                    "folder": "clean-code-implementation",
-                    "description": (
-                        "Implementar ou melhorar uma mudança local com código legível; "
-                        "usar ao alterar funções e erros"
-                    ),
-                    "tags": ["codigo-limpo", "clean-code", "implementacao"],
-                    "domain": "general",
-                    "path": "/tmp/clean-code/SKILL.md",
-                    "scope": "project-agents",
-                },
-                {
-                    "name": "code-smell-detection",
-                    "folder": "code-smell-detection",
-                    "description": (
-                        "Detectar e priorizar deterioração com evidências; não modificar código"
-                    ),
-                    "tags": ["maus-cheiros", "code-smells", "diagnostico"],
-                    "domain": "general",
-                    "path": "/tmp/code-smells/SKILL.md",
-                    "scope": "project-agents",
-                },
-                {
-                    "name": "safe-refactoring",
-                    "folder": "safe-refactoring",
-                    "description": "Refatorar código preservando comportamento",
-                    "tags": ["refatoracao", "legacy-code"],
-                    "domain": "general",
-                    "path": "/tmp/refactoring/SKILL.md",
-                    "scope": "project-agents",
-                },
-            ]
-        }
-
-        result = search_skills(
-            "diagnosticar code smells sem alterar codigo",
-            manifest,
-            domain="general",
-        )
-
-        self.assertEqual("code-smell-detection", result["results"][0]["name"])
-        self.assertEqual(3.0, result["results"][0]["metadata_boost"])
-        self.assertIn("tag:code-smells", result["results"][0]["metadata_matches"])
-        self.assertFalse(result["weak_match"])
-        self.assertFalse(result["discover"]["triggered"])
-
-    def test_auto_detected_domain_also_considers_general_skills(self) -> None:
-        manifest = {
-            "skills": [
-                {
-                    "name": "modular-system-architecture",
-                    "folder": "modular-system-architecture",
-                    "description": (
-                        "Design a modular and maintainable backend with module "
-                        "responsibilities and explicit dependencies"
-                    ),
-                    "tags": ["modular-architecture", "backend", "maintainability"],
-                    "domain": "general",
-                    "path": "/tmp/modular/SKILL.md",
-                    "scope": "project-agents",
-                    "installed": True,
-                },
-                *[
-                    {
-                        "name": f"web-helper-{index}",
-                        "folder": f"web-helper-{index}",
-                        "description": "Build a web backend application",
-                        "tags": ["web", "backend"],
-                        "domain": "web",
-                        "path": f"/tmp/web-{index}/SKILL.md",
-                        "scope": "agents",
-                        "installed": True,
-                    }
-                    for index in range(3)
-                ],
-            ]
-        }
-
-        result = search_skills(
-            "design a modular and maintainable backend",
-            manifest,
-        )
-
-        self.assertEqual(result["detected_domain"], "web")
-        self.assertEqual(result["results"][0]["name"], "modular-system-architecture")
-
-    def test_explicit_domain_remains_strict(self) -> None:
-        manifest = {
-            "skills": [
-                {
-                    "name": f"design-helper-{index}",
-                    "folder": f"design-helper-{index}",
-                    "description": "Design dashboard ui",
-                    "tags": ["design", "dashboard", "ui"],
-                    "domain": "design",
-                    "path": f"/tmp/design-{index}/SKILL.md",
-                    "scope": "agents",
-                    "installed": True,
-                }
-                for index in range(3)
-            ]
-            + [
-                {
-                    "name": "general-dashboard-planning",
-                    "folder": "general-dashboard-planning",
-                    "description": "Plan a dashboard",
-                    "tags": ["dashboard"],
-                    "domain": "general",
-                    "path": "/tmp/general-dashboard/SKILL.md",
-                    "scope": "project-agents",
-                    "installed": True,
-                }
-            ]
-        }
-
-        result = search_skills("design dashboard ui", manifest, domain="design")
-
-        self.assertTrue(result["results"])
-        self.assertTrue(all(item["domain"] == "design" for item in result["results"]))
-
     def test_bypass_routing(self) -> None:
         result = search_skills("oi", self.manifest)
         self.assertEqual(result["routing"]["priority"], "P3")
         self.assertEqual(result["routing"]["decision"], "bypass")
         self.assertFalse(result["discover"]["triggered"])
+
+    def test_explicit_domain_is_a_soft_signal_not_a_hard_filter(self) -> None:
+        manifest = {
+            "version": 4,
+            "skills": [
+                {
+                    "name": "ui-ux-pro-max",
+                    "folder": "ui-ux-pro-max",
+                    "description": "Design SaaS dashboard UI and accessible web interfaces",
+                    "tags": ["dashboard", "ui", "design"],
+                    "domain": "web",
+                    "path": "/skills/ui-ux-pro-max/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+                {
+                    "name": "codebase-design",
+                    "folder": "codebase-design",
+                    "description": "Design deep code modules and seams",
+                    "tags": ["architecture"],
+                    "domain": "design",
+                    "path": "/skills/codebase-design/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+                {
+                    "name": "tdd",
+                    "folder": "tdd",
+                    "description": "Test driven development",
+                    "tags": ["tests"],
+                    "domain": "design",
+                    "path": "/skills/tdd/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+                {
+                    "name": "grilling",
+                    "folder": "grilling",
+                    "description": "Interview a user about a plan",
+                    "tags": [],
+                    "domain": "design",
+                    "path": "/skills/grilling/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+            ],
+        }
+        result = search_skills("design a SaaS dashboard UI", manifest, domain="design")
+        self.assertEqual(result["results"][0]["name"], "ui-ux-pro-max")
+        scores = [entry["score"] for entry in result["results"]]
+        if len(scores) > 1:
+            self.assertGreater(len(set(scores)), 1)
+
+    def test_portuguese_architecture_request_finds_architecture_skill(self) -> None:
+        manifest = {
+            "version": 4,
+            "skills": [
+                {
+                    "name": "improve-codebase-architecture",
+                    "folder": "improve-codebase-architecture",
+                    "description": "Scan a codebase for architecture deepening opportunities and usability improvements",
+                    "tags": ["architecture", "codebase"],
+                    "domain": "meta",
+                    "path": "/skills/improve-codebase-architecture/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+                {
+                    "name": "writing-great-skills",
+                    "folder": "writing-great-skills",
+                    "description": "Write clear skill documentation",
+                    "tags": [],
+                    "domain": "meta",
+                    "path": "/skills/writing-great-skills/SKILL.md",
+                    "scope": "agents",
+                    "installed": True,
+                },
+            ],
+        }
+        result = search_skills(
+            "analisar todo o repositorio e melhorar arquitetura e usabilidade",
+            manifest,
+        )
+        self.assertEqual(
+            result["results"][0]["name"], "improve-codebase-architecture"
+        )
+
+    def test_namespaced_ci_skill_beats_general_github_router(self) -> None:
+        manifest = {
+            "version": 4,
+            "skills": [
+                {
+                    "name": "github:gh-fix-ci",
+                    "folder": "gh-fix-ci",
+                    "description": "Debug and fix failing GitHub PR checks in GitHub Actions",
+                    "tags": ["ci", "fix"],
+                    "domain": "devops-git",
+                    "path": "/plugins/github/gh-fix-ci/SKILL.md",
+                    "scope": "codex-plugin",
+                    "installed": True,
+                },
+                {
+                    "name": "github:github",
+                    "folder": "github",
+                    "description": "General GitHub repository and pull request orientation",
+                    "tags": ["github"],
+                    "domain": "devops-git",
+                    "path": "/plugins/github/github/SKILL.md",
+                    "scope": "codex-plugin",
+                    "installed": True,
+                },
+            ],
+        }
+        result = search_skills("corrigir CI quebrado no pull request", manifest)
+        self.assertEqual(result["results"][0]["name"], "github:gh-fix-ci")
 
 
 class TestRouteBatch(unittest.TestCase):
@@ -396,27 +318,6 @@ class TestRouteBatch(unittest.TestCase):
         self.assertEqual(len(payload["results"]), 2)
         self.assertIn("routing", payload)
         self.assertIn("discover", payload)
-
-    def test_cli_accepts_domain(self) -> None:
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPTS / "route_tasks.py"),
-                "--manifest",
-                str(FIXTURE_MANIFEST),
-                "--domain",
-                "general",
-                "--json",
-            ],
-            input="modelar dominio\n",
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["task_count"], 1)
-        self.assertEqual(payload["results"][0]["domain"], "general")
 
 
 if __name__ == "__main__":

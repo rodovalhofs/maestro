@@ -11,23 +11,29 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from catalog import CatalogError  # noqa: E402
+from domains import DOMAINS  # noqa: E402
 from search_skills import (  # noqa: E402
     DEFAULT_MANIFEST,
     configure_stdout_utf8,
     load_manifest,
     search_skills,
 )
-from domains import DOMAINS  # noqa: E402
+
+MAX_TASKS = 100
+MAX_TASK_LENGTH = 10_000
 
 
 def route_batch(
     tasks: list[str],
     manifest_path: Path,
     domain: str | None = None,
+    project_root: Path | None = None,
+    local_only: bool = False,
 ) -> dict:
     manifest = load_manifest(manifest_path)
     results = [
-        search_skills(task.strip(), manifest, domain=domain)
+        search_skills(task.strip(), manifest, domain=domain, project_root=project_root, local_only=local_only)
         for task in tasks
         if task.strip()
     ]
@@ -50,9 +56,9 @@ def route_batch(
     if "P0" in priorities:
         batch_priority, batch_decision = "P0", "recommend"
     elif "P1" in priorities:
-        batch_priority, batch_decision = "P1", "auto-load"
+        batch_priority, batch_decision = "P1", "review-candidates"
     elif "P2" in priorities:
-        batch_priority, batch_decision = "P2", "optional-load"
+        batch_priority, batch_decision = "P2", "compare-candidates"
     else:
         batch_priority, batch_decision = "P3", "bypass"
 
@@ -84,6 +90,8 @@ def main() -> int:
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--project-root", default=str(Path.cwd()))
+    parser.add_argument("--local-only", action="store_true")
     args = parser.parse_args()
 
     if args.tasks:
@@ -91,7 +99,23 @@ def main() -> int:
     else:
         tasks = [line.strip() for line in sys.stdin if line.strip()]
 
-    payload = route_batch(tasks, Path(args.manifest), domain=args.domain)
+    if len(tasks) > MAX_TASKS or any(len(task) > MAX_TASK_LENGTH for task in tasks):
+        print(
+            f"Error: route accepts at most {MAX_TASKS} tasks of {MAX_TASK_LENGTH} characters each.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        payload = route_batch(tasks, Path(args.manifest), domain=args.domain,
+                              project_root=Path(args.project_root).resolve(), local_only=args.local_only)
+    except (CatalogError, OSError) as error:
+        payload = {"error": "catalog_unavailable", "message": str(error)}
+        if args.json or not sys.stdout.isatty():
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(f"Error: {error}", file=sys.stderr)
+        return 2
 
     if args.json or not sys.stdout.isatty():
         print(json.dumps(payload, indent=2, ensure_ascii=False))

@@ -78,14 +78,19 @@ gh label create -f templates/labels.json  # ou script proprio
 ```powershell
 # Na raiz do clone do repositorio maestro
 .\scripts\sync-templates.ps1 -TargetRepo "C:\caminho\do\seu\projeto"
+# Revise o dry-run; depois aplique sem sobrescrever arquivos existentes:
+.\scripts\sync-templates.ps1 -TargetRepo "C:\caminho\do\seu\projeto" -Apply
+# Use -Force somente para substituir os arquivos mapeados que voce revisou.
 ```
 
 ```bash
 # macOS / Linux (PowerShell Core)
 pwsh ./scripts/sync-templates.ps1 -TargetRepo "$HOME/projetos/meu-repo"
+pwsh ./scripts/sync-templates.ps1 -TargetRepo "$HOME/projetos/meu-repo" -Apply
 ```
 
-Nao versione `templates/` dentro de cada repo de aplicacao; copie para `.github/` local.
+O script exige um repositorio Git, faz dry-run por padrao e nunca apaga `.github/`.
+Sem `-Force`, arquivos existentes sao preservados. Arquivos nao mapeados nunca sao removidos.
 
 ## Skills relacionadas (Cursor)
 

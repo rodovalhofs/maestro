@@ -21,6 +21,18 @@ from runbooks import (  # noqa: E402
 
 
 class TestRunbooks(unittest.TestCase):
+    def test_oversized_project_runbook_is_reported_and_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            runbook = project / ".maestro" / "skill-runbooks.json"
+            runbook.parent.mkdir(parents=True)
+            runbook.write_text(" " * 1_000_001, encoding="utf-8")
+
+            data = load_runbooks(project)
+
+            self.assertTrue(any("exceeds" in error["message"] for error in data["errors"]))
+            self.assertNotIn("project-only", data["skills"])
+
     def test_bundled_has_ui_ux_pro_max(self) -> None:
         data = load_runbooks()
         skills = data["skills"]
@@ -101,8 +113,101 @@ class TestRunbooks(unittest.TestCase):
                 self.assertEqual(items, ["rodovalhofs/maestro"])
                 self.assertTrue(is_repo_allowlisted("rodovalhofs/maestro"))
                 self.assertFalse(is_repo_allowlisted("evil/unknown"))
+                self.assertFalse(
+                    is_repo_allowlisted("attacker/rodovalhofs/maestro-malware")
+                )
             finally:
                 rb.DISCOVER_ALLOWLIST = original
+
+    def test_invalid_project_entry_is_reported_and_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            config_dir = project / ".maestro"
+            config_dir.mkdir()
+            (config_dir / "skill-runbooks.json").write_text(
+                json.dumps({"skills": {"tdd": "not-an-object"}}),
+                encoding="utf-8",
+            )
+
+            data = load_runbooks(project)
+
+            self.assertNotIn("tdd", data["skills"])
+            self.assertTrue(data["errors"])
+            self.assertIn("tdd", data["errors"][0]["message"])
+
+    def test_malformed_project_json_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            config_dir = project / ".maestro"
+            config_dir.mkdir()
+            (config_dir / "skill-runbooks.json").write_text("{broken", encoding="utf-8")
+
+            data = load_runbooks(project)
+
+            self.assertTrue(data["errors"])
+            self.assertEqual(data["errors"][0]["source"], "project")
+
+    def test_project_preflight_requires_confirmation_and_has_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            config_dir = project / ".maestro"
+            config_dir.mkdir()
+            (config_dir / "skill-runbooks.json").write_text(
+                json.dumps(
+                    {
+                        "skills": {
+                            "custom": {
+                                "summary": "custom",
+                                "preflight": [
+                                    {
+                                        "id": "probe",
+                                        "command": "python",
+                                        "args": ["--version"],
+                                        "effect": "read_local",
+                                        "required": True,
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            results = [
+                {
+                    "name": "custom",
+                    "folder": "custom",
+                    "path": "/skills/custom/SKILL.md",
+                }
+            ]
+
+            runbooks = load_runbooks(project)
+            attach_runbooks(results, runbooks, query="inspect", project_name="Demo")
+
+            preflight = results[0]["runbook"]["preflight"][0]
+            self.assertEqual(preflight["provenance"], "project")
+            self.assertTrue(preflight["requires_confirmation"])
+            self.assertEqual(preflight["effect"], "read_local")
+
+    def test_optional_write_preflight_is_not_enabled_by_default(self) -> None:
+        results = [
+            {
+                "name": "ui-ux-pro-max",
+                "folder": "ui-ux-pro-max",
+                "path": "/tmp/skills/ui-ux-pro-max/SKILL.md",
+            }
+        ]
+        runbooks = load_runbooks()
+        attach_runbooks(results, runbooks, query="dashboard", project_name="Demo")
+
+        persist = next(
+            item
+            for item in results[0]["runbook"]["preflight"]
+            if item["id"] == "design-system-persist"
+        )
+        self.assertFalse(persist["required"])
+        self.assertEqual(persist["effect"], "write_workspace")
+        self.assertFalse(persist["enabled_by_default"])
 
 
 if __name__ == "__main__":

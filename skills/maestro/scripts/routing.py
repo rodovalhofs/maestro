@@ -1,106 +1,54 @@
-#!/usr/bin/env python3
-"""P0-P3 routing decisions for maestro skill matches."""
-
+"""Retrieval policy. Metadata scores are evidence, never calibrated confidence."""
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
-AUTO_LOAD_CONFIDENCE = 0.22
-OPTIONAL_LOAD_CONFIDENCE = 0.12
-REFERENCE_BM25_SCORE = 8.0
-
 HIGH_RISK_PATTERNS = [
-    r"config\b", r"\.env", r"auth", r"delete", r"remove", r"rm\s",
-    r"push\s+--force", r"deploy", r"secret", r"password", r"token",
-    r"excluir", r"remover", r"deletar", r"deploy", r"producao", r"produção",
-    r"\bPOST\b", r"\bPUT\b", r"\bDELETE\b",
+    r"\bauth(?:entication|orization)?\b", r"\bdelete\b", r"\bremove\b",
+    r"(?:^|\s)rm\s", r"\bpush\s+--force\b", r"\bdeploy\b",
+    r"\bsecret\b", r"\bpassword\b", r"\btoken\b", r"\bexcluir\b",
+    r"\bremover\b", r"\bdeletar\b", r"\bproducao\b", r"\bpublish\b",
 ]
-
-VALID_MODES = {"auto-load", "recommend", "bypass"}
-
-
-def bm25_to_confidence(score: float) -> float:
-    """Map BM25 score to 0-1 confidence without external calibration."""
-    if score <= 0:
-        return 0.0
-    return min(1.0, score / REFERENCE_BM25_SCORE)
 
 
 def is_high_risk(task: str) -> bool:
-    task_lower = task.lower()
-    return any(re.search(pat, task_lower, re.IGNORECASE) for pat in HIGH_RISK_PATTERNS)
+    normalized = "".join(c for c in unicodedata.normalize("NFKD", task.casefold())
+                         if not unicodedata.combining(c))
+    return any(re.search(pattern, normalized) for pattern in HIGH_RISK_PATTERNS)
 
 
-def select_mode(
-    confidence: float,
-    high_risk: bool,
-    suggested_mode: str = "",
-    bypass: bool = False,
-) -> str:
+def select_mode(score: float, high_risk: bool, suggested_mode: str = "",
+                bypass: bool = False) -> str:
+    # Kept as an adapter for callers; a retrieval score never authorizes loading.
+    return "bypass" if bypass else "recommend"
+
+
+def build_routing(task: str, matches: list[dict[str, Any]], high_risk: bool,
+                  bypass: bool = False) -> dict[str, Any]:
+    margin = None
+    if len(matches) > 1 and matches[0].get("score", 0) > 0:
+        margin = (matches[0]["score"] - matches[1]["score"]) / matches[0]["score"]
+    ambiguous = margin is not None and margin < 0.15
     if bypass:
-        return "bypass"
-    if high_risk:
-        return "recommend"
-    if suggested_mode in VALID_MODES:
-        return suggested_mode
-    if confidence >= AUTO_LOAD_CONFIDENCE:
-        return "auto-load"
-    if confidence >= OPTIONAL_LOAD_CONFIDENCE:
-        return "recommend"
-    return "recommend"
-
-
-def build_routing(
-    task: str,
-    matches: list[dict[str, Any]],
-    high_risk: bool,
-    bypass: bool = False,
-) -> dict[str, Any]:
-    if bypass or not matches:
-        return {
-            "priority": "P3",
-            "decision": "bypass",
-            "reason": "Simple or answer-only task; proceed without skill routing.",
-            "load_limit": 0,
-            "report_policy": "silent",
-        }
-
-    if high_risk:
-        return {
-            "priority": "P0",
-            "decision": "recommend",
-            "reason": "High-risk task; confirm before side effects.",
-            "load_limit": 1,
-            "report_policy": "report",
-        }
-
-    top = matches[0]
-    confidence = float(top.get("confidence", 0))
-    mode = str(top.get("mode", "recommend"))
-
-    if mode == "auto-load" and confidence >= AUTO_LOAD_CONFIDENCE:
-        return {
-            "priority": "P1",
-            "decision": "auto-load",
-            "reason": "Strong workflow match.",
-            "load_limit": 3,
-            "report_policy": "silent",
-        }
-
-    if confidence >= OPTIONAL_LOAD_CONFIDENCE:
-        return {
-            "priority": "P2",
-            "decision": "optional-load",
-            "reason": "Medium confidence; use skill only if it changes execution.",
-            "load_limit": 2,
-            "report_policy": "silent",
-        }
-
+        priority, decision, reason = "P3", "bypass", "Self-contained answer-only task."
+    elif not matches:
+        priority = "P0" if high_risk else "P3"
+        decision, reason = "no-match", "No local metadata match; assess the gap before discovery."
+    else:
+        priority = "P0" if high_risk else ("P2" if ambiguous else "P1")
+        decision = "compare-candidates" if ambiguous else "review-candidates"
+        reason = ("Close alternatives; compare their instructions and project context."
+                  if ambiguous else "Read candidate instructions before selecting skills.")
     return {
-        "priority": "P3",
-        "decision": "bypass",
-        "reason": "No strong installed skill match.",
-        "load_limit": 0,
-        "report_policy": "silent",
+        "priority": priority, "decision": decision, "reason": reason,
+        "load_limit": 0, "review_limit": 0 if bypass else min(5, len(matches)),
+        "report_policy": "silent" if bypass else "report",
+        "score_kind": "uncalibrated_retrieval_score",
+        "requires_content_review": bool(matches) and not bypass,
+        "relative_margin": round(margin, 4) if margin is not None else None,
+        "ambiguous": ambiguous and not bypass,
+        "question_policy": "ask_only_if_content_review_leaves_a_selection_changing_unknown",
+        "execution_authorized": False,
     }

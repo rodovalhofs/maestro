@@ -1,12 +1,16 @@
 import * as p from "@clack/prompts";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import { detectAgents, filterAgentsByFlags } from "./detect-agents.js";
 import {
-  copySkillTo,
+  commitSkillCopy,
   migrateLegacyFiles,
+  rollbackSkillCopy,
   saveSetupConfig,
+  stageSkillBundle,
 } from "./install.js";
-import { getMaestroPaths } from "./paths.js";
-import { registerOnSkillsSh, runBuildManifest } from "./run-manifest.js";
+import { BUNDLED_SKILLS, getMaestroPaths } from "./paths.js";
+import { runBuildManifest } from "./run-manifest.js";
 
 export async function runSetup(options) {
   const project = Boolean(options.project);
@@ -42,7 +46,6 @@ export async function runSetup(options) {
     agents = filterAgentsByFlags(agents, options);
   } else if (options.yes) {
     agents = agents.filter((a) => a.detected);
-    if (!agents.length) agents = detectAgents({ project, cwd });
   }
 
   if (!agents.length) {
@@ -50,27 +53,34 @@ export async function runSetup(options) {
     process.exit(1);
   }
 
-  let registerSkillsSh = false;
-  if (!options.yes && !options.noSkillsRegistry) {
-    const reg = await p.confirm({
-      message: "Register install on skills.sh via npx skills add? (optional telemetry)",
-      initialValue: false,
-    });
-    if (p.isCancel(reg)) {
-      p.cancel("Setup cancelled.");
-      process.exit(0);
-    }
-    registerSkillsSh = Boolean(reg);
-  }
-
   const spinner = p.spinner();
+  const paths = getMaestroPaths();
+  const preflightOutput = join(paths.home, `.setup-preflight-${process.pid}.json`);
+  spinner.start("Checking Python and local catalog access...");
+  const preflight = runBuildManifest({
+    projectRoot: cwd,
+    quiet: true,
+    output: preflightOutput,
+  });
+  rmSync(preflightOutput, { force: true });
+  if (!preflight.ok) {
+    spinner.stop("Local setup preflight failed");
+    throw new Error(
+      `${preflight.error}\nNothing was installed. Run: maestro-skills doctor`,
+    );
+  }
+  spinner.stop("Local runtime ready");
+
   const installed = [];
+  const transactions = [];
 
   for (const agent of agents) {
     spinner.start(`Installing Maestro for ${agent.label}…`);
     try {
-      const dest = copySkillTo(agent.skillsPath);
-      installed.push({ id: agent.id, label: agent.label, path: dest });
+      const bundle = stageSkillBundle(agent.skillsPath);
+      transactions.push(...bundle);
+      const dest = bundle[0].dest;
+      installed.push({ id: agent.id, label: agent.label, path: dest, skillsPath: agent.skillsPath, skills: BUNDLED_SKILLS });
       spinner.stop(`Installed → ${dest}`);
     } catch (err) {
       spinner.stop(`Failed for ${agent.label}`);
@@ -95,39 +105,42 @@ export async function runSetup(options) {
     installedSkillPath: installed[0]?.path,
   });
   if (manifestResult.ok) {
-    spinner.stop(manifestResult.message);
+    spinner.stop("Skills manifest ready");
   } else {
     spinner.stop("Manifest build failed");
-    p.log.warn(manifestResult.error);
+    for (const transaction of transactions.reverse()) rollbackSkillCopy(transaction);
+    throw new Error(
+      `${manifestResult.error}\nInstallation changes were rolled back. ` +
+        "Run: maestro-skills doctor",
+    );
   }
 
-  if (registerSkillsSh) {
-    spinner.start("Registering on skills.sh…");
-    const reg = await registerOnSkillsSh(agents, { yes: false, interactive: true });
-    if (reg.ok && !reg.skipped) spinner.stop("Registered on skills.sh");
-    else if (reg.manual_command) {
-      spinner.stop("skills.sh registration requires manual review");
-      p.log.info(`Run manually if desired:\n  npx ${reg.manual_command.replace(/^npx /, "")}`);
-    } else if (!reg.ok) {
-      spinner.stop("skills.sh registration skipped");
-      p.log.warn(reg.error);
-    } else spinner.stop("No skills CLI agents selected");
+  try {
+    saveSetupConfig({
+      installedAt: new Date().toISOString(),
+      scope: project ? "project" : "global",
+      projectRoot: project ? cwd : null,
+      agents: installed,
+      maestroHome: paths.home,
+    });
+  } catch (error) {
+    for (const transaction of transactions.reverse()) rollbackSkillCopy(transaction);
+    runBuildManifest({ projectRoot: cwd, quiet: true });
+    throw new Error(`Setup registry failed; installation changes were rolled back: ${error.message}`);
   }
 
-  const paths = getMaestroPaths();
-  saveSetupConfig({
-    version: 1,
-    installedAt: new Date().toISOString(),
-    scope: project ? "project" : "global",
-    projectRoot: project ? cwd : null,
-    agents: installed,
-    maestroHome: paths.home,
-  });
+  for (const transaction of transactions) {
+    try {
+      commitSkillCopy(transaction);
+    } catch (error) {
+      p.log.warn(`Installed successfully but could not remove backup ${transaction.backup}: ${error.message}`);
+    }
+  }
 
   p.note(
     installed.map((i) => `${i.label}\n  ${i.path}`).join("\n\n"),
     "Installed paths",
   );
-  p.outro("Maestro setup complete. Invoke with $maestro or /maestro in your agent.");
+  p.outro("Maestro and Prompt Designer installed. Prepare with $maestro-prompt-designer; execute with $maestro.");
 }
-
+

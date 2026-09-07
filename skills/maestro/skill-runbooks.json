@@ -42,24 +42,30 @@
           "id": "design-system",
           "label": "Generate design system",
           "when": "Any task that changes how the UI looks, feels, or behaves",
-          "command": "py",
+          "command": "python3",
+          "required": true,
+          "effect": "read_local",
           "args": [
-            "-3",
             "{skill_scripts}/search.py",
             "{query}",
             "--design-system",
             "-p",
             "{project_name}"
           ],
-          "notes": "Windows: py -3. Unix: replace command with python3 and drop -3. Attach output to subagent prompt."
+          "platforms": {
+            "win32": {"command": "py", "args_prefix": ["-3"]},
+            "default": {"command": "python3", "args_prefix": []}
+          },
+          "notes": "Read-only preflight. Attach output to the implementation subagent prompt."
         },
         {
           "id": "design-system-persist",
           "label": "Persist design system to project",
           "when": "Multi-session work; team shares tokens via git",
-          "command": "py",
+          "command": "python3",
+          "required": false,
+          "effect": "write_workspace",
           "args": [
-            "-3",
             "{skill_scripts}/search.py",
             "{query}",
             "--design-system",
@@ -67,7 +73,11 @@
             "-p",
             "{project_name}"
           ],
-          "notes": "Creates design-system/MASTER.md and optional design-system/pages/<page>.md. Run from project root."
+          "platforms": {
+            "win32": {"command": "py", "args_prefix": ["-3"]},
+            "default": {"command": "python3", "args_prefix": []}
+          },
+          "notes": "Optional write. Requires explicit user approval before execution."
         }
       ],
       "commands": {

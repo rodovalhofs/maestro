@@ -2,230 +2,178 @@
 
 # Maestro
 
-**Meta-orquestrador de skills para agentes de IA**
+**Local-first skill routing for AI coding agents**
 
-Descubra skills locais, monte um grafo editável e execute com subagentes —  
-sem adivinhar qual skill chamar.
-
-<br>
-
-[![CI](https://github.com/rodovalhofs/maestro/actions/workflows/ci.yml/badge.svg)](https://github.com/rodovalhofs/maestro/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/maestro-skills?label=maestro-skills)](https://www.npmjs.com/package/maestro-skills)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](.github/workflows/ci.yml)
-[![Socket Badge](https://badge.socket.dev/npm/package/maestro-skills/0.1.3)](https://badge.socket.dev/npm/package/maestro-skills/0.1.3)
-
-<br>
+Prepare an approved specification, compare skill instructions against project
+evidence, and execute the complete objective through validated phases.
 
 ```bash
 npx maestro-skills setup
 ```
 
-[Documentação do CLI](docs/maestro-skills-cli.md) · [skills.sh](https://skills.sh/rodovalhofs/maestro) · [Issues](https://github.com/rodovalhofs/maestro/issues)
+[CLI](docs/maestro-skills-cli.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [MIT](LICENSE)
 
 </div>
 
-<br>
+## Why Maestro
 
----
+Coding agents often accumulate many skills across Cursor, Claude Code, Codex, and
+`~/.agents/skills`. Maestro creates one catalog with provenance, ranks the skills
+for a prompt, and proposes the smallest useful dependency graph.
 
-## Visão geral
+- Local-first: search, routing, diagnostics, and manifest generation do not use the network.
+- Project-safe: the active project's skills are overlaid at query time; another project's skills do not leak into results.
+- Plugin-aware: Codex plugin skills are namespaced, for example `github:gh-fix-ci`.
+- Evidence-based: ranking finds candidates; the agent reads instructions before choosing.
+- Integrated preparation: Prompt Designer works with grilling in the same conversation and saves a local specification.
+- Targeted research: the agent researches confirmed gaps with public technical terms; installation requires approval.
+- Human-controlled: graph approval and existing effect-specific authorizations govern execution.
+- Cross-platform: the npm CLI and Python adapters support Windows, macOS, and Linux.
 
-O **Maestro** responde à pergunta:
+## Quick start
 
-> *Para esta tarefa, quais skills devo usar, em que ordem, e preciso instalar algo novo?*
-
-Ele **não implementa** o trabalho — orquestra: busca skills instaladas, propõe um **grafo de dependências**, espera sua confirmação e só então dispara subagentes com os `SKILL.md` corretos.
-
-| | |
-|---|---|
-| **Agentes** | Cursor · Claude Code · Codex · Universal (`~/.agents/skills`) |
-| **Motor** | BM25 normalizado + boost limitado de nome/tags + manifest local (`~/.maestro/`) |
-| **Discover** | Detecta lacunas (`skeleton-loader`, libs no prompt) e busca no [skills.sh](https://skills.sh/) |
-| **Roteamento** | Prioridade P0–P3 · intents · concept gaps · sinônimos PT/EN |
-
-> Inspirado em ideias de [task-skill-router](https://github.com/wcqxgjy6d8-pixel/task-skill-router).
-
----
-
-## Início rápido
-
-### 1. Instalar (interativo)
+Requirements: Node.js 18+ and Python 3.10+.
 
 ```bash
+# Install into detected agent skill directories
 npx maestro-skills setup
-```
 
-O setup detecta agentes, pergunta onde instalar (global ou `--project`), copia a skill e gera o manifest.
-
-| Agente | Pasta | Flag |
-|--------|-------|------|
-| Cursor | `~/.cursor/skills/maestro` | `--cursor` |
-| Claude Code | `~/.claude/skills/maestro` | `--claude` |
-| Codex | `~/.codex/skills/maestro` | `--codex` |
-| Universal | `~/.agents/skills/maestro` | `--universal` |
-
-```bash
-# Exemplos
+# Or target agents explicitly
 npx maestro-skills setup --codex --cursor -y
-npx maestro-skills setup --project
-npx @rodovalhofs/maestro setup          # bin curto (scoped)
+
+# Install only in the current repository
+npx maestro-skills setup --project --codex -y
+
+# Verify the local installation
+npx maestro-skills doctor
 ```
 
-### 2. Usar no agente
+Invoke it in your agent:
 
 ```text
-$maestro criar dashboard de vendas com React
-$maestro vamos colocar skeleton-loader na UI
-$maestro corrigir CI quebrado no PR #42
+$maestro improve this repository's architecture and test strategy
+$maestro fix the CI failure and explain the root cause
+$maestro which installed skills should I use for this dashboard?
 ```
 
-### 3. Regenerar índice (após instalar novas skills)
+## CLI
 
 ```bash
-py -3 ~/.cursor/skills/maestro/scripts/build_manifest.py --project-root .
-```
+# Compact output by default; use --json for automation
+npx maestro-skills search "dashboard react"
+npx maestro-skills search "fix CI" --domain devops-git --json
 
-Manifest: `~/.maestro/skills-manifest.json`
+# Route multiple tasks
+npx maestro-skills route --task "design UI" --task "validate accessibility" --json
+printf "design UI\nfix CI\n" | npx maestro-skills route --json
 
----
-
-## Como funciona
-
-```text
-  Seu prompt
-      │
-      ▼
-  search_skills.py ──► match forte? ──► grafo único → ok → subagentes
-      │
-      └─ discover.triggered
-              │
-              ▼
-          npx skills find → Grafo 1 → ok → install → Grafo 2 → ok → execução
-```
-
-### Gatilhos do ramo Discover
-
-| Sinal | Exemplo |
-|-------|---------|
-| `weak_match` | Nenhuma skill local confiável |
-| `concept_gap` | *"colocar skeleton-loader na UI"* |
-| `force_discover` | *"find a skill for changelog"* |
-| `single_local_skill` | Um candidato local com score baixo |
-
-Máximo de **2** concept gaps por prompt.
-
----
-
-## O que faz / o que não faz
-
-| Faz | Não faz |
-|-----|---------|
-| Busca skills **instaladas** e monta grafo | Implementar código sozinho |
-| Detecta conceitos sem skill local | Spawnar subagentes sem seu **ok** |
-| Sugere install via `npx skills find` | Enviar dados para servidores externos |
-| Roteia P0–P3 com confirmação em alto risco | Substituir o agente principal |
-
----
-
-## Outras formas de instalar
-
-<details>
-<summary><strong>npx skills</strong> (catálogo skills.sh)</summary>
-
-```bash
-npx skills add rodovalhofs/maestro --skill maestro -g -a cursor -a codex -y
-```
-
-</details>
-
-<details>
-<summary><strong>Git clone</strong> (manual)</summary>
-
-```powershell
-git clone https://github.com/rodovalhofs/maestro.git
-Copy-Item -Recurse -Force maestro\skills\maestro $env:USERPROFILE\.codex\skills\maestro
-```
-
-```bash
-git clone https://github.com/rodovalhofs/maestro.git
-cp -r maestro/skills/maestro ~/.codex/skills/maestro
-```
-
-Depois rode `build_manifest.py` (ver acima).
-
-</details>
-
----
-
-## CLI de debug
-
-```bash
-# Buscar skills (recomendado — funciona no PowerShell)
-npx maestro-skills search "dashboard react" --json
-
-# Rotear sub-tarefas
-npx maestro-skills route --task "design UI" --task "fix CI" --json
-
-# Regenerar manifest
+# Rebuild and diagnose
 npx maestro-skills manifest --project-root .
+npx maestro-skills doctor --json
 
-# Runbooks do usuário
+# Manage local runbooks
 npx maestro-skills runbook list
-npx maestro-skills runbook init-allowlist
+npx maestro-skills runbook add my-skill --summary "Local lint" --notes "Run before implementation"
+
+# Remove one project without touching other installations
+npx maestro-skills remove --project . -y
 ```
 
-PowerShell fallback: `& "$env:USERPROFILE\.cursor\skills\maestro\scripts\invoke.ps1" search "..." --json`
+The scoped package exposes the same commands with a shorter binary:
 
-Campos úteis no JSON: `results`, `routing`, `discover`, `runbook` (por skill), `weak_match`, `metadata_boost` e `metadata_matches`.
+```bash
+npx @rodovalhofs/maestro doctor
+```
 
-A busca normaliza maiúsculas e diacríticos, portanto consultas como `código` e `codigo` são equivalentes. Correspondências completas de nomes e tags compostas recebem um boost limitado por skill; tags repetidas não acumulam score.
+## How routing works
 
-Domínios (`--domain`): `web` · `data-viz` · `analytics` · `design` · `creative` · `devops-git` · `video-media` · `integrations` · `security` · `meta` · `general`
+```text
+conversation + approved spec + project evidence
+  -> project-aware metadata retrieval (BM25 + intents + domain hint)
+  -> read candidate SKILL.md -> compare objective / phase / compatibility / restrictions
+  -> research confirmed gaps -> explain selection -> graph approval -> validated phases
+```
 
----
+The catalog stores declared skill metadata and local paths. Missing descriptions do
+not cause arbitrary `SKILL.md` body content to be copied into the manifest. Duplicate
+skills retain all locations while selecting one canonical path by scope priority.
 
-## Repositório
+The CLI remains offline. The agent researches confirmed gaps or explicitly requested
+alternatives unless the user prohibits network access. Suggested external queries
+are assembled from reviewed public technical vocabulary, never raw user prose.
+Unknown terms require agent review. Installation still requires explicit approval.
+
+Retrieval scores are uncalibrated and never authorize automatic loading. Version
+0.3.0 replaces the old JSON `confidence` field with `evidence`; routing decisions
+are `review-candidates`, `compare-candidates`, `no-match` or `bypass`. Consumers must
+perform content review before selection. See [CLI migration](docs/maestro-skills-cli.md).
+
+## Prepare and execute in one conversation
+
+Setup installs both `maestro` and `maestro-prompt-designer` in each selected target.
+Use your existing grilling skill with Prompt Designer to resolve decisions one at
+a time. Grilling is optional and is not redistributed by this package.
+
+```text
+Use grilling with maestro-prompt-designer to clarify this task.
+[Discuss and approve the specification.]
+$maestro execute the approved specification.
+```
+
+The spec stays under `<project>/.maestro/specs/<task>.md`, outside npm archives.
+Maestro reuses the conversation and spec; there is no need to paste them again.
+For full projects, it retains later phases until all requested acceptance criteria
+are satisfied. Relevant missing decisions may still require clarification.
+
+## Local data
+
+The CLI writes to installation targets and `~/.maestro/`; Prompt Designer also
+saves task specifications in the selected project's `.maestro/specs/`:
+
+```text
+~/.maestro/
+├── config.json                  # versioned multi-project install registry
+├── skills-manifest.json         # local skill metadata and provenance
+├── maestro-exclude.txt          # local search exclusions
+├── skill-runbooks.user.json     # user runbooks
+└── discover-allowlist.txt       # reviewed remote repositories
+```
+
+Project runbooks may live at `<project>/.maestro/skill-runbooks.json`. User/project
+preflights and side-effecting preflights require applicable authorization. See
+[SECURITY.md](SECURITY.md) for the threat model and data boundaries.
+
+## Repository layout
 
 ```text
 maestro/
-├── packages/maestro-skills/   ← CLI npm (npx maestro-skills)
-├── skills/maestro/            ← skill + scripts Python
-├── tests/                     ← motor de busca
-├── docs/                      ← CLI + fluxo GitHub
-└── templates/                 ← Issue/PR para outros repos
+├── skills/maestro/              # canonical skill and Python routing engine
+├── packages/maestro-skills/     # canonical npm CLI
+├── packages/rodovalhofs-maestro/# scoped adapter generated from the canonical CLI
+├── tests/                       # Python behavior and security tests
+├── docs/                        # user and maintainer documentation
+└── scripts/                     # package synchronization and release helpers
 ```
 
-| Pasta | Conteúdo |
-|-------|----------|
-| `skills/maestro/` | `SKILL.md`, `search_skills.py`, `concept_gaps.py`, … |
-| `packages/maestro-skills/` | `setup` / `remove` interativos |
-| `docs/` | [maestro-skills-cli.md](docs/maestro-skills-cli.md) · [github-workflow.md](docs/github-workflow.md) |
-
----
-
-## Pré-requisitos
-
-| Ferramenta | Necessário | Para quê |
-|------------|------------|----------|
-| **Node.js 18+** | Setup / Discover | `npx maestro-skills`, `npx skills find` |
-| **Python 3.12+** | Busca / manifest | `search_skills.py`, `build_manifest.py` |
-| **Agente com skills** | Uso | Cursor, Claude, Codex ou `~/.agents/skills` |
-
----
-
-## Desenvolvimento
+## Development
 
 ```bash
-py -3 -m unittest discover -s tests -v
-cd packages/maestro-skills && npm test
+node scripts/sync-skill-to-cli.mjs
+python -m unittest discover -s tests -v
+npm ci --prefix packages/maestro-skills
+npm test --prefix packages/maestro-skills
 ```
 
----
+Before publishing, also inspect both package archives:
 
-## Contribuir · Segurança · Licença
+```bash
+npm run verify:packages
+python scripts/evaluate-routing.py
+```
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — Issues e PRs bem-vindos
-- [SECURITY.md](SECURITY.md) — revise pacotes de `npx skills find` antes de instalar
-- [MIT](LICENSE) — Copyright (c) 2026 Yuri Rodovalho
+Release inputs are explicitly listed in `scripts/release-layout.mjs`. Verification
+packs and scans actual tar contents, checks the exact inventory and SHA-512 integrity,
+and rejects unexpected files, symbolic links, common secret formats and personal paths.
+This complements human privacy review; it does not prove that arbitrary text contains
+no private information. Use `node scripts/verify-packages.mjs --keep` to retain inspected
+archives under `artifacts/release/`. No local code change implies publication permission.

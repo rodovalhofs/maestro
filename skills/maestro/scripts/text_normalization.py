@@ -17,7 +17,7 @@ def search_tokens(value: object) -> list[str]:
     """Tokenize text consistently across queries, metadata, and documents."""
     normalized = fold_text(value).replace("_", " ")
     normalized = re.sub(r"[^\w\s]", " ", normalized)
-    return [token for token in normalized.split() if len(token) > 2]
+    return [token for token in normalized.split() if len(token) > 1]
 
 
 def searchable_phrase(value: object) -> str:
