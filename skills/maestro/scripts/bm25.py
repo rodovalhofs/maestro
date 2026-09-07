@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-import re
-import unicodedata
 from collections import defaultdict
 from math import log
+from text_normalization import search_tokens
 
 STOPWORDS = set("a an the and or for of to in on with from is are this that please "
                 "use using want need uma um o os as de da do das dos e ou para por "
@@ -25,10 +24,7 @@ class BM25:
         self.n = 0
 
     def tokenize(self, text: str) -> list[str]:
-        text = unicodedata.normalize("NFKD", str(text).casefold())
-        text = "".join(c for c in text if not unicodedata.combining(c))
-        text = re.sub(r"[^\w\s]", " ", text)
-        return [w for w in text.split() if len(w) > 1 and w not in STOPWORDS]
+        return [token for token in search_tokens(text) if token not in STOPWORDS]
 
     def fit(self, documents: list[str]) -> None:
         self.corpus = [self.tokenize(doc) for doc in documents]

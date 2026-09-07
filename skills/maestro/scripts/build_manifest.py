@@ -19,6 +19,7 @@ from catalog import (  # noqa: E402,F401
     parse_frontmatter,
     parse_tags_from_text,
     scan_skill_root,
+    resolve_skill_domain,
 )
 from maestro_paths import MANIFEST_PATH  # noqa: E402
 

@@ -11,7 +11,7 @@ export const SKILL_FILES = {
     "scripts/catalog.py", "scripts/concept_gaps.py", "scripts/discovery.py", "scripts/domains.py",
     "scripts/intents.py", "scripts/invoke.ps1", "scripts/invoke.sh", "scripts/maestro_paths.py",
     "scripts/route_tasks.py", "scripts/routing.py", "scripts/runbooks.py",
-    "scripts/search_skills.py", "scripts/synonyms.py",
+    "scripts/search_skills.py", "scripts/synonyms.py", "scripts/text_normalization.py",
   ],
   "maestro-prompt-designer": ["SKILL.md", "references/task-spec-template.md"],
 };

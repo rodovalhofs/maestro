@@ -138,11 +138,16 @@ def classify_skill(name: str, description: str) -> str:
     return "general"
 
 
+def strip_safe_execution_phrases(text: str) -> str:
+    return re.sub(r"\bcom\s+seguranca\b", " ", _normalize(text), flags=re.IGNORECASE)
+
+
 def classify_query(query: str) -> tuple[str, dict[str, int]]:
     scores = {domain: 0 for domain in DOMAINS}
     for domain, keywords in DOMAIN_KEYWORDS.items():
+        searchable = strip_safe_execution_phrases(query) if domain == "security" else query
         for kw in keywords:
-            if _contains_keyword(query, kw):
+            if _contains_keyword(searchable, kw):
                 scores[domain] += 1
 
     best_score = max(scores.values())

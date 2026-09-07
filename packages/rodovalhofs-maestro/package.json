@@ -53,6 +53,7 @@
     "skill/scripts/runbooks.py",
     "skill/scripts/search_skills.py",
     "skill/scripts/synonyms.py",
+    "skill/scripts/text_normalization.py",
     "skill/skill-runbooks.json",
     "skill/skill-runbooks.md"
   ],

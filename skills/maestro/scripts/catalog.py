@@ -107,6 +107,16 @@ def load_exclude_list(path: Path = EXCLUDE_PATH) -> set[str]:
     }
 
 
+def resolve_skill_domain(name: str, description: str, raw_domain: str) -> str:
+    """Prefer a valid declared domain and infer only when it is absent or invalid."""
+    declared = raw_domain.strip().lower()
+    if declared == "cybersecurity":
+        declared = "security"
+    if declared in DOMAINS:
+        return declared
+    return classify_skill(name, description)
+
+
 def _read_skill(
     skill_md: Path,
     *,
@@ -126,7 +136,7 @@ def _read_skill(
     description = meta.get("description", "") or f"Installed skill: {raw_name}"
     tags = parse_tags_from_text(text)
     raw_domain = meta.get("domain", "").strip().lower()
-    domain = raw_domain if raw_domain in DOMAINS else classify_skill(raw_name, f"{description} {' '.join(tags)}")
+    domain = resolve_skill_domain(raw_name, f"{description} {' '.join(tags)}", raw_domain)
     entry: dict[str, Any] = {
         "name": name,
         "folder": skill_md.parent.name,
