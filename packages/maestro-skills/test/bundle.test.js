@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +33,7 @@ test("public CLI installs, upgrades, diagnoses and removes both skills in one pr
     const health = JSON.parse(run("doctor", "--json"));
     assert.equal(health.ok, true);
     const payload = JSON.parse(run("route", "--task", "consolidate task specification", "--local-only", "--json"));
-    assert.equal(payload.results[0].catalog.active_project_root, root.replaceAll("\\", "/"));
+    assert.equal(payload.results[0].catalog.active_project_root, realpathSync(root).replaceAll("\\", "/"));
     assert.equal(payload.results[0].discover.enabled, false);
     assert.ok(payload.results[0].results.some((skill) => skill.name === "maestro-prompt-designer"));
     run("remove", "--project", root, "-y");

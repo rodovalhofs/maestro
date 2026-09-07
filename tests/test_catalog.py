@@ -83,10 +83,10 @@ class TestSkillCatalog(unittest.TestCase):
 
             self.assertEqual(manifest["skill_count"], 1)
             skill = manifest["skills"][0]
-            self.assertEqual(Path(skill["path"]), codex_path)
+            self.assertEqual(Path(skill["path"]), codex_path.resolve())
             self.assertEqual(
                 {Path(location["path"]) for location in skill["locations"]},
-                {universal_path, codex_path},
+                {universal_path.resolve(), codex_path.resolve()},
             )
 
     def test_codex_plugin_skills_are_namespaced(self) -> None:
@@ -112,7 +112,7 @@ class TestSkillCatalog(unittest.TestCase):
             self.assertEqual(manifest["skill_count"], 1)
             skill = manifest["skills"][0]
             self.assertEqual(skill["name"], "github:gh-fix-ci")
-            self.assertEqual(Path(skill["path"]), skill_path)
+            self.assertEqual(Path(skill["path"]), skill_path.resolve())
             self.assertEqual(skill["plugin"], "github")
 
     def test_codex_plugin_selects_latest_numeric_version(self) -> None:
@@ -125,7 +125,7 @@ class TestSkillCatalog(unittest.TestCase):
 
             manifest = build_catalog(global_roots=[], plugin_root=plugin_root)
 
-            self.assertEqual(Path(manifest["skills"][0]["path"]), newest)
+            self.assertEqual(Path(manifest["skills"][0]["path"]), newest.resolve())
             self.assertEqual(manifest["skills"][0]["plugin_version"], "10.0.0")
 
     def test_invalid_manifest_version_is_rejected(self) -> None:
