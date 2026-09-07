@@ -54,7 +54,7 @@ test("package archive verification targets both public package directories", () 
     cwd: REPO_ROOT,
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /maestro-skills@0\.2\.0/);
-  assert.match(result.stdout, /@rodovalhofs\/maestro@0\.2\.0/);
+  assert.match(result.stdout, /maestro-skills@0\.3\.0/);
+  assert.match(result.stdout, /@rodovalhofs\/maestro@0\.3\.0/);
   assert.doesNotMatch(result.stdout, /maestro-monorepo/);
 });

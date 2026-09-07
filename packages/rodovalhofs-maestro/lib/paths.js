@@ -39,14 +39,17 @@ export function resolveSkillsDir(agent, { project = false, cwd = process.cwd() }
 }
 
 /** Resolve bundled skill folder (works for npm pack and monorepo-root publish). */
-export function skillSourceDir() {
+export const BUNDLED_SKILLS = ["maestro", "maestro-prompt-designer"];
+
+export function skillSourceDir(skillName = "maestro") {
+  if (!BUNDLED_SKILLS.includes(skillName)) throw new Error(`Unknown bundled skill: ${skillName}`);
   const candidates = [];
 
   let dir = PACKAGE_ROOT;
   for (let i = 0; i < 5; i++) {
     candidates.push(
-      join(dir, "skill"),
-      join(dir, "skills", "maestro"),
+      join(dir, skillName === "maestro" ? "skill" : "designer"),
+      join(dir, "skills", skillName),
     );
     dir = resolve(dir, "..");
   }

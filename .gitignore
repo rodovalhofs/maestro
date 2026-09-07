@@ -12,4 +12,8 @@ skills-manifest.json
 node_modules/
 packages/**/node_modules/
 packages/**/skill/
+packages/**/designer/
+.maestro/specs/
+artifacts/
 package-lock.json
+!packages/maestro-skills/package-lock.json

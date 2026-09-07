@@ -51,6 +51,7 @@ export function createProgram({
     .option("--project-root <path>", "Project root for catalog overlay and runbooks")
     .option("--project-name <name>", "Project display name for design-system -p")
     .option("--max-results <n>", "Max results", "5")
+    .option("--local-only", "Disable external discovery suggestions")
     .option("--json", "Emit full JSON")
     .action((query, opts) => {
       const maxResults = Number(opts.maxResults);
@@ -64,6 +65,7 @@ export function createProgram({
         projectRoot: opts.projectRoot || process.cwd(),
         projectName: opts.projectName,
         maxResults,
+        localOnly: opts.localOnly,
       });
       if (!result.ok) {
         console.error(result.error);
@@ -76,6 +78,8 @@ export function createProgram({
   program
     .command("route")
     .description("Route multiple sub-tasks to skills (stdin or --task)")
+    .option("--project-root <path>", "Project root for catalog overlay and runbooks")
+    .option("--local-only", "Disable external discovery suggestions")
     .option("--task <task>", "Single task (repeatable)", (value, acc = []) => acc.concat(value), [])
     .option("--domain <domain>", "Domain signal")
     .option("--json", "Emit full JSON")
@@ -94,7 +98,7 @@ export function createProgram({
         process.exitCode = 1;
         return;
       }
-      const result = runRoute(tasks, { domain: opts.domain });
+      const result = runRoute(tasks, { domain: opts.domain, projectRoot: opts.projectRoot || process.cwd(), localOnly: opts.localOnly });
       if (!result.ok) {
         console.error(result.error);
         process.exitCode = result.code || 1;
@@ -236,7 +240,7 @@ function formatSearch(payload) {
     `Weak match: ${payload.weak_match ? "yes" : "no"}`,
   ];
   if (payload.discover?.triggered) {
-    lines.push(`Discover: ${payload.discover.reasons.join(", ")} (network consent required)`);
+    lines.push(`Discover: ${payload.discover.reasons.join(", ")} (${payload.discover.enabled ? "agent review required; CLI stays offline" : "local-only"})`);
   }
   lines.push("");
   for (const [index, skill] of (payload.results || []).entries()) {

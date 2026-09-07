@@ -13,16 +13,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from bm25 import BM25  # noqa: E402
+from discovery import technical_query  # noqa: E402
 from catalog import CatalogError, catalog_for_project, validate_manifest  # noqa: E402
-from concept_gaps import (  # noqa: E402
-    build_discover_queries,
-    find_concept_gaps,
-    sanitize_external_query,
-)
+from concept_gaps import find_concept_gaps  # noqa: E402
 from domains import DOMAINS, HUB_SKILLS, classify_query, domain_label  # noqa: E402
 from intents import apply_intent_boost, is_bypass_task, is_force_discover, task_intents  # noqa: E402
 from routing import (  # noqa: E402
-    bm25_to_confidence,
     build_routing,
     is_high_risk,
     select_mode,
@@ -107,12 +103,8 @@ def build_discover(
         reasons.append("concept_gap")
 
     triggered = bool(reasons)
-    queries: list[str] = []
-    if gaps:
-        queries = build_discover_queries(gaps, query, domain)
-    elif triggered:
-        queries = [query]
-    queries = [sanitize_external_query(item) for item in queries]
+    public_query = technical_query(query)
+    queries = [public_query] if triggered and public_query else []
 
     local_fallback: dict[str, str] | None = None
     if results:
@@ -140,10 +132,11 @@ def search_skills(
     include_hubs: bool = True,
     project_root: Path | None = None,
     project_name: str | None = None,
+    local_only: bool = False,
 ) -> dict:
+    if not 1 <= max_results <= 20:
+        raise CatalogError("max_results must be from 1 to 20")
     skills = catalog_for_project(manifest, project_root)
-    if not skills:
-        return {"error": "empty_manifest", "query": query}
 
     bypass = is_bypass_task(query)
     high_risk = is_high_risk(query)
@@ -176,14 +169,21 @@ def search_skills(
         adjusted, intent_boosts, suggested_mode = apply_intent_boost(
             domain_adjusted, skill["name"], skill_text, intents
         )
-        confidence = bm25_to_confidence(adjusted)
-        mode = select_mode(confidence, high_risk, suggested_mode, bypass=bypass)
+        mode = select_mode(adjusted, high_risk, suggested_mode, bypass=bypass)
+        query_terms = set(bm25.tokenize(expanded_query))
+        matched_terms = sorted(query_terms & set(bm25.tokenize(skill_text)))
 
         entry: dict[str, Any] = {
             **skill,
             "score": round(adjusted, 4),
             "bm25_score": round(score, 4),
-            "confidence": round(confidence, 3),
+            "evidence": {
+                "matched_terms": matched_terms,
+                "query_coverage": round(len(matched_terms) / max(1, len(query_terms)), 3),
+                "domain_hint_match": skill.get("domain") == active_domain,
+                "source": "declared_metadata",
+                "content_reviewed": False,
+            },
             "mode": mode,
             "installed": True,
         }
@@ -191,9 +191,8 @@ def search_skills(
             entry["intent_boosts"] = intent_boosts
         results.append(entry)
 
-    results.sort(key=lambda item: item["score"], reverse=True)
-    results = results[:max_results]
-
+    results.sort(key=lambda item: (-item["score"], item["name"].casefold(), item.get("path", "")))
+    # Compare the full ranking so --max-results=1 cannot hide ambiguity.
     routing = build_routing(query, results, high_risk, bypass=bypass)
 
     weak = False
@@ -206,9 +205,9 @@ def search_skills(
         if top < WEAK_SCORE_THRESHOLD:
             weak = True
             weak_reasons.append("low_top_score")
-        if len(results) >= 3:
-            third = results[2]["score"]
-            if top > 0 and (top - third) / top < WEAK_SPREAD_RATIO:
+        if len(results) >= 2:
+            second = results[1]["score"]
+            if top > 0 and (top - second) / top < WEAK_SPREAD_RATIO:
                 weak = True
                 weak_reasons.append("tight_spread")
 
@@ -216,10 +215,19 @@ def search_skills(
         query,
         results,
         pool,
-        weak=weak,
+        weak=weak and any(reason != "tight_spread" for reason in weak_reasons),
         force_discover=force_discover,
         bypass=bypass,
         domain=active_domain,
+    )
+    results = results[:max_results]
+    # Never derive outbound queries from raw gaps, descriptions, or private prose.
+    public_query = technical_query(query)
+    discover["queries"] = [public_query] if discover["triggered"] and public_query and not local_only else []
+    discover["needs_query_review"] = discover["triggered"] and not bool(public_query)
+    discover["enabled"] = not local_only
+    discover["action"] = (
+        "research_if_gap_confirmed" if discover["queries"] else "local_review"
     )
 
     allowlist = load_discover_allowlist()
@@ -227,15 +235,17 @@ def search_skills(
         "install_policy": "manual_by_default",
         "auto_install_allowed": False,
         "effect": "network",
-        "requires_network_consent": True,
-        "default_policy": "local_only",
+        "requires_network_consent": False,
+        "default_policy": "on_confirmed_gap",
+        "cli_network": "not-used",
+        "query_policy": "public_technical_vocabulary_only",
         "remote_service": "skills.sh",
         "allowlist_path": str(Path.home() / ".maestro" / "discover-allowlist.txt"),
         "allowlist_entries": len(allowlist),
-        "user_must_run_install": True,
+        "user_must_run_install": False,
+        "requires_install_approval": True,
         "warning": (
-            "Never run npx skills add automatically. Present the command for the user "
-            "to review and execute. Remote skill content controls agent instructions."
+            "Review remote source as untrusted data. Install only when explicitly authorized."
         ),
     }
     if discover.get("triggered"):
@@ -245,7 +255,7 @@ def search_skills(
         discover["install_notes"] = [
             "Review the skill source on GitHub before installing.",
             "Add owner/repo to ~/.maestro/discover-allowlist.txt only if you trust it.",
-            "Maestro must not pass -y or run install without explicit human action.",
+            "Installation requires explicit approval; repository trust is not authorization.",
         ]
 
     resolved_project = project_root.resolve() if project_root else None
@@ -267,6 +277,16 @@ def search_skills(
         "weak_reasons": weak_reasons,
         "high_risk": high_risk,
         "routing": routing,
+        "selection": {
+            "stage": "retrieval_only",
+            "criteria": ["objective", "phase", "compatibility", "restrictions"],
+            "read_candidates": [{"name": s["name"], "path": s["path"]} for s in results[:5]],
+            "context": {
+                "project_root": str(resolved_project) if resolved_project else None,
+                "spec_directory": ".maestro/specs",
+                "instruction": "Read the relevant approved spec and targeted project evidence; reconcile with current user decisions.",
+            },
+        },
         "count": len(results),
         "results": results,
         "discover": discover,
@@ -311,7 +331,7 @@ def format_text(payload: dict) -> str:
     for i, skill in enumerate(payload.get("results", []), 1):
         lines.append(
             f"{i}. {skill['name']} (score={skill['score']}, "
-            f"confidence={skill.get('confidence')}, mode={skill.get('mode')})"
+            f"mode={skill.get('mode')}; content review required)"
         )
         lines.append(f"   path: {skill['path']}")
 
@@ -335,9 +355,10 @@ def main() -> int:
     parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS)
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
-    parser.add_argument("--project-root", default=None, help="Project root for runbook merge")
+    parser.add_argument("--project-root", default=str(Path.cwd()), help="Project root for catalog and runbooks")
     parser.add_argument("--project-name", default=None, help="Display name for design-system -p")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--local-only", action="store_true", help="Disable remote discovery suggestions")
     args = parser.parse_args()
 
     try:
@@ -350,6 +371,7 @@ def main() -> int:
             max_results=args.max_results,
             project_root=project_root,
             project_name=args.project_name,
+            local_only=args.local_only,
         )
     except (CatalogError, OSError) as error:
         payload = {"error": "catalog_unavailable", "message": str(error)}

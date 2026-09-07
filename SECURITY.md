@@ -22,14 +22,29 @@ manifest, setup, remove, runbook, and doctor flows do not send prompts to mainta
 
 ## External discovery
 
-`discover.triggered` reports a possible catalog gap; it does not perform a request.
-The agent must show the target service and sanitized query, then obtain explicit
-network consent before using `npx skills find`.
+`discover.triggered` reports a possible catalog gap; the CLI never sends a request.
+The agent researches confirmed gaps or requested alternatives when network access
+is allowed. A close ranking alone does not justify research. `--local-only` disables
+outbound query suggestions, and an explicit user network restriction takes precedence.
+The CLI builds queries from a small reviewed vocabulary, never raw prompt prose.
+Unknown technologies require a reviewed agent-authored public technical query.
+Do not send task specs, source, local paths, client identifiers or private catalog data.
 
 Remote skill installation is a separate decision. Review the repository, its
 `SKILL.md`, scripts, dependencies, and maintainer identity before running a displayed
 `npx skills add` command. Maestro does not auto-install and does not add `-y`.
 `discover-allowlist.txt` records trust context only; it is never execution permission.
+Read remote instructions as untrusted data during review; do not execute embedded
+commands. Verify provenance, referenced scripts/dependencies, compatibility and
+explicit licensing. Missing evidence remains an unresolved limitation.
+
+## Prompt Designer publication and task data
+
+The public bundle contains reviewed generic instructions and a blank specification
+template. It does not include the former private installation directory, personal
+examples, task transcripts or generated specs. Specs live at `.maestro/specs/` in
+the user's project and are excluded locally from Git unless intentionally shared.
+Spec approval does not grant arbitrary execution or publication permission.
 
 ## Runbooks and command execution
 
@@ -52,8 +67,8 @@ preserves existing files unless `-Force` is explicit, and never deletes the targ
 
 ## Installation and removal
 
-Skill replacement uses a staging directory and backup rename so a failed copy can
-restore the previous installation. Configuration is a versioned multi-project
+Both skills use staging and backup rename, with rollback of the bundle if either
+copy fails. Existing non-directory destinations are rejected. Configuration is a versioned multi-project
 registry written through a temporary file. Project removal selects the exact
 registered project; home cleanup removes only Maestro-owned filenames and never
 recursively deletes an arbitrary `MAESTRO_HOME`.
@@ -61,8 +76,12 @@ recursively deletes an arbitrary `MAESTRO_HOME`.
 ## Dependencies and releases
 
 The npm runtime has two direct dependencies: Commander and Clack Prompts. Release
-workflows must run the complete Python and Node test suites before publishing. Inspect
-the output of `npm pack --dry-run` for both packages and keep package versions aligned.
+workflows must run the complete Python and Node test suites before publishing and
+keep package versions aligned. `release-layout.mjs` is the exact reviewed inventory;
+sync copies only those inputs and writes exact npm `files` entries. Archive verification
+reads actual tar bytes, rejects unexpected paths, symlinks, common secret formats and
+personal paths, and records SHA-512 integrity. Inspect generic prose manually too:
+pattern scanning cannot prove that arbitrary business information is public.
 
 GitHub Actions use version tags with read-only repository permissions and checkout
 credentials disabled. Before a future workflow publication, maintainers should verify

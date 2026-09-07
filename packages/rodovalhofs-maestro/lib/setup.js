@@ -7,9 +7,9 @@ import {
   migrateLegacyFiles,
   rollbackSkillCopy,
   saveSetupConfig,
-  stageSkillCopy,
+  stageSkillBundle,
 } from "./install.js";
-import { getMaestroPaths } from "./paths.js";
+import { BUNDLED_SKILLS, getMaestroPaths } from "./paths.js";
 import { runBuildManifest } from "./run-manifest.js";
 
 export async function runSetup(options) {
@@ -77,10 +77,10 @@ export async function runSetup(options) {
   for (const agent of agents) {
     spinner.start(`Installing Maestro for ${agent.label}…`);
     try {
-      const transaction = stageSkillCopy(agent.skillsPath);
-      transactions.push(transaction);
-      const dest = transaction.dest;
-      installed.push({ id: agent.id, label: agent.label, path: dest, skillsPath: agent.skillsPath });
+      const bundle = stageSkillBundle(agent.skillsPath);
+      transactions.push(...bundle);
+      const dest = bundle[0].dest;
+      installed.push({ id: agent.id, label: agent.label, path: dest, skillsPath: agent.skillsPath, skills: BUNDLED_SKILLS });
       spinner.stop(`Installed → ${dest}`);
     } catch (err) {
       spinner.stop(`Failed for ${agent.label}`);
@@ -141,6 +141,6 @@ export async function runSetup(options) {
     installed.map((i) => `${i.label}\n  ${i.path}`).join("\n\n"),
     "Installed paths",
   );
-  p.outro("Maestro setup complete. Invoke with $maestro or /maestro in your agent.");
+  p.outro("Maestro and Prompt Designer installed. Prepare with $maestro-prompt-designer; execute with $maestro.");
 }
 

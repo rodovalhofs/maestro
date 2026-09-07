@@ -79,11 +79,13 @@ class TestRouting(unittest.TestCase):
         mode = select_mode(0.9, high_risk=True)
         self.assertEqual(mode, "recommend")
 
-    def test_p1_auto_load(self) -> None:
+    def test_metadata_never_authorizes_loading(self) -> None:
         matches = [{"confidence": 0.4, "mode": "auto-load"}]
         routing = build_routing("design dashboard ui", matches, high_risk=False)
         self.assertEqual(routing["priority"], "P1")
-        self.assertEqual(routing["decision"], "auto-load")
+        self.assertEqual(routing["decision"], "review-candidates")
+        self.assertEqual(routing["load_limit"], 0)
+        self.assertFalse(routing["execution_authorized"])
 
     def test_high_risk_without_matches_remains_p0(self) -> None:
         routing = build_routing("delete production secrets", [], high_risk=True)
@@ -146,7 +148,8 @@ class TestSearchSkills(unittest.TestCase):
         self.assertIn("concept_gap", discover["reasons"])
         self.assertIn("skeleton-loader", discover["gaps"])
         self.assertTrue(discover["queries"])
-        self.assertTrue(discover["security"]["requires_network_consent"])
+        self.assertFalse(discover["security"]["requires_network_consent"])
+        self.assertTrue(discover["security"]["requires_install_approval"])
         self.assertEqual(discover["security"]["effect"], "network")
         self.assertFalse(result.get("missing_skills"))
 

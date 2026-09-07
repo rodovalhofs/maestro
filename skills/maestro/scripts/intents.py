@@ -110,8 +110,8 @@ FORCE_DISCOVER_PATTERNS: list[str] = [
 ]
 
 BYPASS_PATTERNS = [
-    r"^\s*(hi|hello|hey|oi|ola|olá)\b",
-    r"^\s*(what time|que horas)\b",
+    r"^\s*(hi|hello|hey|oi|ola|olá)[!.,\s]*$",
+    r"^\s*(what time is it|que horas são|que horas sao)[?!.\s]*$",
 ]
 
 

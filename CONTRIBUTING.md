@@ -8,7 +8,8 @@ cross-platform fixes, security hardening, tests, and documentation.
 1. Create a branch such as `fix/catalog-isolation` or `feat/doctor-check`.
 2. Add a behavior test that fails for the bug or requirement.
 3. Change the canonical source:
-   - Python engine and skill: `skills/maestro/`;
+   - Python engine and router: `skills/maestro/`;
+   - preparatory skill and template: `skills/maestro-prompt-designer/`;
    - npm runtime: `packages/maestro-skills/`.
 4. Synchronize generated package copies.
 5. Run all validation locally.
@@ -21,7 +22,7 @@ npm test --prefix packages/maestro-skills
 npm run verify:packages
 ```
 
-Do not edit `packages/*/skill/` directly. The scoped package runtime is generated from
+Do not edit `packages/*/skill/` or `packages/*/designer/` directly. The scoped package runtime is generated from
 `packages/maestro-skills/lib/` by the sync script.
 
 ## Compatibility
@@ -31,8 +32,10 @@ Do not edit `packages/*/skill/` directly. The scoped package runtime is generate
 - Windows, macOS, and Linux;
 - Cursor, Claude Code, Codex, and universal agent skill directories.
 
-Keep local-only operations free of implicit network calls. New external effects must
-be represented in output, disabled by default, and covered by consent-oriented tests.
+Keep CLI operations free of implicit network calls. The agent's research workflow
+may use public technical queries for confirmed gaps when network access is allowed;
+installation and other external mutations require applicable authorization.
+Cover data boundaries and effect policies with behavior tests.
 
 ## Pull requests
 

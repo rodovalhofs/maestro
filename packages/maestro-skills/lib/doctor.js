@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { loadSetupConfig } from "./install.js";
-import { getMaestroPaths, packageVersion, skillSourceDir } from "./paths.js";
+import { BUNDLED_SKILLS, getMaestroPaths, packageVersion, skillSourceDir } from "./paths.js";
 import { pythonCommand } from "./python.js";
 import { loadUserRunbooks } from "./runbook.js";
 
@@ -18,8 +18,8 @@ export function runDoctorChecks() {
     : { ok: false, message: "Python 3 is unavailable." };
 
   try {
-    const source = skillSourceDir();
-    checks.skill = { ok: true, path: source };
+    const sources = BUNDLED_SKILLS.map((name) => ({ name, path: skillSourceDir(name) }));
+    checks.skill = { ok: true, path: sources[0].path, sources };
   } catch (error) {
     checks.skill = { ok: false, message: String(error.message || error) };
   }
@@ -68,7 +68,8 @@ export function runDoctorChecks() {
     const agents = installations.flatMap((item) => item.agents);
     const stale = agents.filter((agent) => {
       const skillPath = agent.path || (agent.skillsPath && join(agent.skillsPath, "maestro"));
-      return !skillPath || !existsSync(skillPath);
+      return !skillPath || !existsSync(skillPath)
+        || (agent.skills || ["maestro"]).some((name) => !existsSync(join(agent.skillsPath, name, "SKILL.md")));
     });
     checks.installations = {
       ok: stale.length === 0,

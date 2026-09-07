@@ -28,10 +28,12 @@ def route_batch(
     tasks: list[str],
     manifest_path: Path,
     domain: str | None = None,
+    project_root: Path | None = None,
+    local_only: bool = False,
 ) -> dict:
     manifest = load_manifest(manifest_path)
     results = [
-        search_skills(task.strip(), manifest, domain=domain)
+        search_skills(task.strip(), manifest, domain=domain, project_root=project_root, local_only=local_only)
         for task in tasks
         if task.strip()
     ]
@@ -54,9 +56,9 @@ def route_batch(
     if "P0" in priorities:
         batch_priority, batch_decision = "P0", "recommend"
     elif "P1" in priorities:
-        batch_priority, batch_decision = "P1", "auto-load"
+        batch_priority, batch_decision = "P1", "review-candidates"
     elif "P2" in priorities:
-        batch_priority, batch_decision = "P2", "optional-load"
+        batch_priority, batch_decision = "P2", "compare-candidates"
     else:
         batch_priority, batch_decision = "P3", "bypass"
 
@@ -88,6 +90,8 @@ def main() -> int:
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--domain", default=None, choices=DOMAINS)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--project-root", default=str(Path.cwd()))
+    parser.add_argument("--local-only", action="store_true")
     args = parser.parse_args()
 
     if args.tasks:
@@ -103,7 +107,8 @@ def main() -> int:
         return 2
 
     try:
-        payload = route_batch(tasks, Path(args.manifest), domain=args.domain)
+        payload = route_batch(tasks, Path(args.manifest), domain=args.domain,
+                              project_root=Path(args.project_root).resolve(), local_only=args.local_only)
     except (CatalogError, OSError) as error:
         payload = {"error": "catalog_unavailable", "message": str(error)}
         if args.json or not sys.stdout.isatty():

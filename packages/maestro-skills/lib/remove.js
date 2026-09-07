@@ -55,7 +55,7 @@ export async function runRemove(options) {
       skillsPath: a.skillsPath,
     }));
     const byPath = new Map(
-      [...targets, ...detectedTargets].map((target) => [
+      [...detectedTargets, ...targets].map((target) => [
         pathIdentity(target.skillsPath || dirname(target.path)),
         target,
       ]),
@@ -106,8 +106,10 @@ export async function runRemove(options) {
 
   for (const t of targets) {
     const dir = t.skillsPath || dirname(t.path);
-    const removed = removeSkillFrom(dir);
-    p.log.info(removed ? `Removed ${dir}/maestro` : `Not found: ${dir}/maestro`);
+    for (const skill of t.skills || ["maestro"]) {
+      const removed = removeSkillFrom(dir, skill);
+      p.log.info(removed ? `Removed ${dir}/${skill}` : `Not found: ${dir}/${skill}`);
+    }
   }
 
   if (config) {

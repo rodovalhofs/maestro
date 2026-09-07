@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { writeFileAtomic } from "./atomic-file.js";
-import { getMaestroPaths, skillSourceDir } from "./paths.js";
+import { BUNDLED_SKILLS, getMaestroPaths, skillSourceDir } from "./paths.js";
 
 export function copySkillTo(destDir) {
   const transaction = stageSkillCopy(destDir);
@@ -10,9 +10,12 @@ export function copySkillTo(destDir) {
   return transaction.dest;
 }
 
-export function stageSkillCopy(destDir) {
-  const src = skillSourceDir();
-  const dest = join(destDir, "maestro");
+export function stageSkillCopy(destDir, skillName = "maestro") {
+  const src = skillSourceDir(skillName);
+  const dest = join(resolve(destDir), skillName);
+  if (existsSync(dest) && (!lstatSync(dest).isDirectory() || lstatSync(dest).isSymbolicLink())) {
+    throw new Error(`Skill destination must be a regular directory: ${dest}`);
+  }
   const token = `${process.pid}-${randomUUID()}`;
   const staging = join(destDir, `.maestro-stage-${token}`);
   const backup = join(destDir, `.maestro-backup-${token}`);
@@ -24,10 +27,21 @@ export function stageSkillCopy(destDir) {
     if (existsSync(pycache)) rmSync(pycache, { recursive: true, force: true });
     if (existsSync(dest)) renameSync(dest, backup);
     renameSync(staging, dest);
-    return { dest, backup };
+    return { dest, backup, skillName };
   } catch (error) {
     rmSync(staging, { recursive: true, force: true });
     if (existsSync(backup) && !existsSync(dest)) renameSync(backup, dest);
+    throw error;
+  }
+}
+
+export function stageSkillBundle(destDir) {
+  const transactions = [];
+  try {
+    for (const name of BUNDLED_SKILLS) transactions.push(stageSkillCopy(destDir, name));
+    return transactions;
+  } catch (error) {
+    for (const transaction of transactions.reverse()) rollbackSkillCopy(transaction);
     throw error;
   }
 }
@@ -90,6 +104,10 @@ function normalizeInstallation(config) {
       : recordedPath && dirname(recordedPath);
     if (!skillsPath) throw new Error("Installation agent requires skillsPath or path.");
     const expectedPath = join(skillsPath, "maestro");
+    const skills = agent.skills === undefined ? ["maestro"] : agent.skills;
+    if (!Array.isArray(skills) || !skills.length || skills.some((name) => !BUNDLED_SKILLS.includes(name))) {
+      throw new Error("Invalid bundled skill names in installation registry.");
+    }
     if (recordedPath && pathIdentity(recordedPath) !== pathIdentity(expectedPath)) {
       throw new Error(`Installation path does not match skillsPath: ${recordedPath}`);
     }
@@ -99,6 +117,7 @@ function normalizeInstallation(config) {
       label: String(agent.label || agent.id || "Unknown agent"),
       skillsPath,
       path: expectedPath,
+      skills: [...new Set(skills)],
     };
   });
   return {
@@ -170,8 +189,9 @@ export function loadSetupConfig() {
   }
 }
 
-export function removeSkillFrom(destDir) {
-  const dest = join(destDir, "maestro");
+export function removeSkillFrom(destDir, skillName = "maestro") {
+  if (!BUNDLED_SKILLS.includes(skillName)) throw new Error(`Unknown bundled skill: ${skillName}`);
+  const dest = join(resolve(destDir), skillName);
   if (existsSync(dest)) {
     rmSync(dest, { recursive: true, force: true });
     return true;

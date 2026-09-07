@@ -4,8 +4,13 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import defaultdict
 from math import log
+
+STOPWORDS = set("a an the and or for of to in on with from is are this that please "
+                "use using want need uma um o os as de da do das dos e ou para por "
+                "com em no na nos nas que quero preciso vamos fazer esta este".split())
 
 
 class BM25:
@@ -20,8 +25,10 @@ class BM25:
         self.n = 0
 
     def tokenize(self, text: str) -> list[str]:
-        text = re.sub(r"[^\w\s]", " ", str(text).lower())
-        return [w for w in text.split() if len(w) > 2]
+        text = unicodedata.normalize("NFKD", str(text).casefold())
+        text = "".join(c for c in text if not unicodedata.combining(c))
+        text = re.sub(r"[^\w\s]", " ", text)
+        return [w for w in text.split() if len(w) > 1 and w not in STOPWORDS]
 
     def fit(self, documents: list[str]) -> None:
         self.corpus = [self.tokenize(doc) for doc in documents]
@@ -46,7 +53,7 @@ class BM25:
     def score(self, query: str) -> list[tuple[int, float]]:
         if self.n == 0:
             return []
-        query_tokens = self.tokenize(query)
+        query_tokens = list(dict.fromkeys(self.tokenize(query)))
         scores: list[tuple[int, float]] = []
 
         for idx, doc in enumerate(self.corpus):

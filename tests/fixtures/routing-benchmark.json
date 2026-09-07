@@ -1,0 +1,346 @@
+{
+  "description": "Curated bilingual retrieval regression set, not a calibrated accuracy estimate. Top-1 labels allow equivalent skills; content selection needs separate behavioral review.",
+  "manifest": {
+    "version": 4,
+    "skills": [
+      {
+        "name": "diagnosing-bugs",
+        "folder": "diagnosing-bugs",
+        "description": "Diagnose unexplained bugs, reproduce failures, isolate root cause before changing implementation",
+        "tags": [],
+        "domain": "web",
+        "path": "/benchmark/diagnosing-bugs/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "implement",
+        "folder": "implement",
+        "description": "Implement a specified feature or a confirmed bug fix, validate behavior against acceptance criteria",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/implement/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "tdd",
+        "folder": "tdd",
+        "description": "Test driven development for building features and bug fixes with failing tests before implementation",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/tdd/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "code-review",
+        "folder": "code-review",
+        "description": "Review code changes and find correctness issues against requirements",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/code-review/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "improve-codebase-architecture",
+        "folder": "improve-codebase-architecture",
+        "description": "Analyze repository architecture and module boundaries for deepening opportunities",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/improve-codebase-architecture/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "grilling",
+        "folder": "grilling",
+        "description": "Interview the user about a plan and clarify requirements before implementation",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/grilling/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "maestro-prompt-designer",
+        "folder": "maestro-prompt-designer",
+        "description": "Consolidate approved conversation decisions into a persistent task specification and prompt for Maestro",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/maestro-prompt-designer/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "godot-multiplayer-networking",
+        "folder": "godot-multiplayer-networking",
+        "description": "Godot ENet multiplayer networking desync and synchronization diagnosis",
+        "tags": [],
+        "domain": "general",
+        "path": "/benchmark/godot-multiplayer-networking/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "game-studio:phaser-2d-game",
+        "folder": "phaser-2d-game",
+        "description": "Implement 2D browser games using Phaser and TypeScript",
+        "tags": [],
+        "domain": "web",
+        "path": "/benchmark/game-studio/phaser-2d-game/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "data-analytics:visualize-data",
+        "folder": "visualize-data",
+        "description": "Create statistical charts and data visualizations from quantitative datasets",
+        "tags": [],
+        "domain": "data-viz",
+        "path": "/benchmark/data-analytics/visualize-data/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "edit-article",
+        "folder": "edit-article",
+        "description": "Edit articles for clarity, structure and prose",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/edit-article/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "react-best-practices",
+        "folder": "react-best-practices",
+        "description": "React component rendering performance optimization and best practices",
+        "tags": [],
+        "domain": "web",
+        "path": "/benchmark/react-best-practices/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "github:gh-fix-ci",
+        "folder": "gh-fix-ci",
+        "description": "Fix GitHub Actions failing CI checks on pull requests",
+        "tags": [],
+        "domain": "devops-git",
+        "path": "/benchmark/github/gh-fix-ci/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "github:github",
+        "folder": "github",
+        "description": "General GitHub repository orientation and pull request navigation",
+        "tags": [],
+        "domain": "devops-git",
+        "path": "/benchmark/github/github/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "ui-ux-pro-max",
+        "folder": "ui-ux-pro-max",
+        "description": "Design web dashboard UI UX layouts and accessible interfaces",
+        "tags": [],
+        "domain": "design",
+        "path": "/benchmark/ui-ux-pro-max/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "security-audit",
+        "folder": "security-audit",
+        "description": "Audit application security authentication vulnerabilities and credentials exposure",
+        "tags": [],
+        "domain": "security",
+        "path": "/benchmark/security-audit/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      },
+      {
+        "name": "find-skills",
+        "folder": "find-skills",
+        "description": "Discover and install agent skills from public skill repositories",
+        "tags": [],
+        "domain": "meta",
+        "path": "/benchmark/find-skills/SKILL.md",
+        "scope": "agents",
+        "installed": true
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "ci-en",
+      "query": "fix failing GitHub Actions CI checks",
+      "acceptable": [
+        "github:gh-fix-ci"
+      ]
+    },
+    {
+      "id": "ci-pt",
+      "query": "corrigir CI quebrado no pull request",
+      "acceptable": [
+        "github:gh-fix-ci"
+      ]
+    },
+    {
+      "id": "greeting-task",
+      "query": "oi, corrigir CI quebrado no pull request",
+      "acceptable": [
+        "github:gh-fix-ci"
+      ],
+      "forbidden_decisions": [
+        "bypass"
+      ]
+    },
+    {
+      "id": "react-en",
+      "query": "optimize React rendering performance",
+      "acceptable": [
+        "react-best-practices"
+      ]
+    },
+    {
+      "id": "react-pt",
+      "query": "melhorar performance dos componentes React",
+      "acceptable": [
+        "react-best-practices"
+      ]
+    },
+    {
+      "id": "architecture-en",
+      "query": "analyze repository architecture module boundaries",
+      "acceptable": [
+        "improve-codebase-architecture"
+      ]
+    },
+    {
+      "id": "architecture-pt",
+      "query": "analisar arquitetura do repositorio",
+      "acceptable": [
+        "improve-codebase-architecture"
+      ]
+    },
+    {
+      "id": "godot",
+      "query": "Godot ENet multiplayer desync networking",
+      "acceptable": [
+        "godot-multiplayer-networking"
+      ]
+    },
+    {
+      "id": "phaser",
+      "query": "implement a Phaser TypeScript 2D browser game",
+      "acceptable": [
+        "game-studio:phaser-2d-game"
+      ]
+    },
+    {
+      "id": "charts",
+      "query": "statistical charts quantitative datasets visualization",
+      "acceptable": [
+        "data-analytics:visualize-data"
+      ]
+    },
+    {
+      "id": "article",
+      "query": "edit article prose clarity",
+      "acceptable": [
+        "edit-article"
+      ]
+    },
+    {
+      "id": "ui",
+      "query": "design dashboard UI UX layouts",
+      "acceptable": [
+        "ui-ux-pro-max"
+      ]
+    },
+    {
+      "id": "ui-pt",
+      "query": "melhorar interface visual do painel",
+      "acceptable": [
+        "ui-ux-pro-max"
+      ]
+    },
+    {
+      "id": "debug",
+      "query": "diagnose unexplained failure root cause",
+      "acceptable": [
+        "diagnosing-bugs"
+      ]
+    },
+    {
+      "id": "implementation",
+      "query": "implement specified feature acceptance criteria",
+      "acceptable": [
+        "implement"
+      ]
+    },
+    {
+      "id": "review",
+      "query": "review code changes correctness issues",
+      "acceptable": [
+        "code-review"
+      ]
+    },
+    {
+      "id": "interview",
+      "query": "interview user clarify plan requirements",
+      "acceptable": [
+        "grilling"
+      ]
+    },
+    {
+      "id": "spec",
+      "query": "consolidate approved conversation decisions into persistent task specification",
+      "acceptable": [
+        "maestro-prompt-designer"
+      ]
+    },
+    {
+      "id": "test-first",
+      "query": "test driven development failing test before implementation",
+      "acceptable": [
+        "tdd"
+      ]
+    },
+    {
+      "id": "security",
+      "query": "audit authentication vulnerabilities credentials exposure",
+      "acceptable": [
+        "security-audit"
+      ]
+    },
+    {
+      "id": "greeting",
+      "query": "oi!",
+      "acceptable": [],
+      "decision": "bypass"
+    },
+    {
+      "id": "unknown",
+      "query": "quuxxyzxyz",
+      "acceptable": [],
+      "decision": "no-match",
+      "decisions": [
+        "no-match",
+        "bypass"
+      ]
+    },
+    {
+      "id": "short-2d",
+      "query": "2D",
+      "acceptable": [
+        "game-studio:phaser-2d-game"
+      ]
+    }
+  ]
+}
